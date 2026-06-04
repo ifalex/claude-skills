@@ -1,0 +1,16 @@
+{{- /* Emit only when .Values.configuration is non-empty (inline app config). */ -}}
+{{- if .Values.configuration }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "CHARTNAME.fullname" . }}
+  namespace: {{ include "CHARTNAME.namespace" . | quote }}
+  labels: {{- include "CHARTNAME.labels" . | nindent 4 }}
+  {{- with .Values.commonAnnotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  # Rename the key to whatever filename your app expects (e.g. application.yaml).
+  config: |-
+    {{- .Values.configuration | nindent 4 }}
+{{- end }}

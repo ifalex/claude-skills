@@ -1,0 +1,51 @@
+CHART NAME: {{ .Chart.Name }}
+CHART VERSION: {{ .Chart.Version }}
+APP VERSION: {{ .Chart.AppVersion }}
+
+Release {{ .Release.Name }} deployed to namespace {{ include "CHARTNAME.namespace" . }}.
+
+{{- if .Values.diagnosticMode.enabled }}
+
+⚠ Diagnostic mode is ON — probes disabled and the container command is overridden.
+  Inspect with:
+    kubectl exec -it --namespace {{ include "CHARTNAME.namespace" . }} $(kubectl get pods --namespace {{ include "CHARTNAME.namespace" . }} -l app.kubernetes.io/instance={{ .Release.Name }} -o jsonpath='{.items[0].metadata.name}') -- sh
+{{- else }}
+
+Access the application:
+
+{{- if .Values.ingress.enabled }}
+
+  Ingress host: http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.hostname }}{{ .Values.ingress.path }}
+  Map it to your ingress controller's external IP in /etc/hosts if using a local cluster.
+
+{{- else if eq .Values.service.type "ClusterIP" }}
+
+  The Service is ClusterIP (internal). Port-forward to reach it locally:
+
+    export SVC_PORT=$(kubectl get svc --namespace {{ include "CHARTNAME.namespace" . }} {{ include "CHARTNAME.fullname" . }} -o jsonpath='{.spec.ports[0].port}')
+    kubectl port-forward --namespace {{ include "CHARTNAME.namespace" . }} svc/{{ include "CHARTNAME.fullname" . }} 8080:${SVC_PORT}
+    echo "Visit http://127.0.0.1:8080"
+
+{{- else if eq .Values.service.type "NodePort" }}
+
+    export NODE_PORT=$(kubectl get svc --namespace {{ include "CHARTNAME.namespace" . }} {{ include "CHARTNAME.fullname" . }} -o jsonpath='{.spec.ports[0].nodePort}')
+    export NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[0].address}')
+    echo "Visit http://${NODE_IP}:${NODE_PORT}"
+
+{{- else if eq .Values.service.type "LoadBalancer" }}
+
+  NOTE: the LoadBalancer IP may take a minute to provision.
+    Watch: kubectl get svc --namespace {{ include "CHARTNAME.namespace" . }} -w {{ include "CHARTNAME.fullname" . }}
+
+    export SVC_IP=$(kubectl get svc --namespace {{ include "CHARTNAME.namespace" . }} {{ include "CHARTNAME.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    export SVC_PORT=$(kubectl get svc --namespace {{ include "CHARTNAME.namespace" . }} {{ include "CHARTNAME.fullname" . }} -o jsonpath='{.spec.ports[0].port}')
+    echo "Visit http://${SVC_IP}:${SVC_PORT}"
+
+{{- end }}
+{{- end }}
+
+{{- if and .Values.persistence.enabled (gt (int .Values.replicaCount) 1) (not (has "ReadWriteMany" .Values.persistence.accessModes)) }}
+
+⚠ WARNING: persistence is enabled with replicaCount > 1 and a non-RWX access mode.
+  Multiple replicas cannot share a ReadWriteOnce volume. Use a StatefulSet or ReadWriteMany storage.
+{{- end }}

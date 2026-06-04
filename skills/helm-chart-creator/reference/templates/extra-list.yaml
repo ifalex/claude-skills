@@ -1,0 +1,5 @@
+{{- /* Escape hatch: deploy arbitrary extra manifests via .Values.extraDeploy (rendered as templates). */ -}}
+{{- range .Values.extraDeploy }}
+---
+{{ include "CHARTNAME.tplvalues.render" (dict "value" . "context" $) }}
+{{- end }}

@@ -1,0 +1,19 @@
+# Self-contained chart — no common library dependency (helpers are inlined in templates/_helpers.tpl).
+apiVersion: v2
+name: CHARTNAME
+description: <one-line description from interview>
+type: application
+# version = chart packaging version (bump on every chart change, semver)
+version: 0.1.0
+# appVersion = the application version being deployed (often the image tag)
+appVersion: "<appVersion>"
+keywords:
+  - <keyword>
+home: ""
+sources:
+  - ""
+maintainers:
+  - name: <maintainer or team>
+    email: ""
+annotations:
+  category: Application
