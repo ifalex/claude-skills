@@ -2,7 +2,20 @@
 
 ## Section order (follow exactly — Bitnami convention)
 
-Always emit sections in this order. Every leaf param gets a `## @param <path> <description>` comment on the line(s) above it (this is what Bitnami's `readme-generator` consumes and what makes values self-documenting).
+Always emit sections in this order. The `## @section <Title>` lines are human-readable dividers. Document each value with a **helm-docs `# -- <description>` comment on the line directly above its leaf key** — this is what generates the `README.md` values table (see `helm-docs.md`). Example:
+
+```yaml
+## @section <App> image parameters
+image:
+  # -- Container image registry
+  registry: docker.io
+  # -- Container image repository
+  repository: <repo>
+  # -- (string) Image tag, defaults to chart appVersion
+  tag: "<tag>"
+```
+
+Use `# -- (type) ...` hints on empty values, `# @default -- ...` to override a shown default, and `# @ignored` to hide a value. Do **not** put a `# --` on a parent key unless you want the whole block documented as one row (it suppresses the nested leaves). The skeleton below omits per-leaf `# --` comments for brevity — add them when emitting.
 
 ```yaml
 # Copyright / license header (optional)
