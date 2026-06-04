@@ -77,12 +77,13 @@ After the interview:
 1. **Confirm the plan** — list chart name, workload type, every enabled feature, and all security defaults applied. Get a yes before writing.
 2. **Create the chart directory** at the path the user wants (default: `./<chart-name>/`). Never write to a repo root if other layout is conventional — ask if unsure.
 3. **Write files** using `reference/templates/` as the source of truth. Replace the `CHARTNAME` placeholder with the real chart name everywhere. Only emit templates for enabled features (e.g. skip `hpa.yaml` if HPA disabled).
-   - Required always: `Chart.yaml`, `values.yaml`, `values.schema.json`, `values-dev.yaml`, `values-uat.yaml`, `values-prod.yaml`, `templates/_helpers.tpl`, `templates/<workload>.yaml`, `templates/service.yaml`, `templates/serviceaccount.yaml`, `templates/NOTES.txt`, `templates/extra-list.yaml`, `.helmignore` (the reference file is named `dot-helmignore` — rename on copy)
+   - Required always: `Chart.yaml`, `values.yaml`, `values.schema.json`, `PARAMETERS.md`, `values-dev.yaml`, `values-uat.yaml`, `values-prod.yaml`, `templates/_helpers.tpl`, `templates/<workload>.yaml`, `templates/service.yaml`, `templates/serviceaccount.yaml`, `templates/NOTES.txt`, `templates/extra-list.yaml`, `.helmignore` (the reference file is named `dot-helmignore` — rename on copy)
    - Workload-specific: `<workload>` = `deployment.yaml` | `statefulset.yaml` | `daemonset.yaml` (emit exactly one). For StatefulSet also emit `headless-service.yaml`. For a **Deployment with persistence**, also emit `pvc.yaml` (StatefulSet uses its built-in `volumeClaimTemplates` instead — do NOT emit pvc.yaml for it).
    - Conditional: `ingress.yaml`, `configmap.yaml`, `secrets.yaml`, `hpa.yaml` (Deployment only), `pdb.yaml`, `networkpolicy.yaml`, `servicemonitor.yaml`
-4. **Build values.yaml** following the Bitnami section order in `reference/values-and-schema.md`. Every param gets a `## @param` doc comment.
-5. **Run quality gates** (next section). Fix until clean.
-6. **Summarize**: tree of files created, validation results, and the exact `helm install` / `helm upgrade` commands per environment.
+4. **Build values.yaml** following the Bitnami section order in `reference/values-and-schema.md`. Every param gets a `## @param <dotted.path> <description>` doc comment placed **directly above its leaf key** (the values-docs generator reads the default from the next line, so placement matters).
+5. **Generate `PARAMETERS.md`** — a markdown table of every configurable value, its description, and default, built from the `## @param` metadata. Default to the dependency-free generator in `reference/values-docs.md`; if the user wants the canonical Bitnami tool (which can also regenerate `values.schema.json` from the same metadata), use `readme-generator-for-helm` per that file.
+6. **Run quality gates** (next section). Fix until clean.
+7. **Summarize**: tree of files created (including `PARAMETERS.md`), validation results, and the exact `helm install` / `helm upgrade` commands per environment.
 
 ## Quality Gates (MANDATORY — do not declare done until clean)
 
@@ -104,10 +105,13 @@ Full commands, install instructions, and the failure→fix table are in **`refer
 | Forgetting `CHARTNAME` replacement | Search the generated chart for `CHARTNAME` before validating |
 | Declaring done without running gates | Run `helm lint` + `helm template` minimum, every time |
 | Persistence on a Deployment with >1 replica | Warn: RWO volumes don't share; use StatefulSet or RWX storage |
+| `PARAMETERS.md` shows `{}` for a scalar value | The `## @param` was placed above a parent key, not its leaf — move it directly above the leaf and regenerate |
+| Skipping `PARAMETERS.md` | Always generate it from `values.yaml` metadata so users have a values reference |
 
 ## Reference Files
 
 - `reference/explanations.md` — full question catalog, defaults, "what is X" explanations, per-env overlay defaults
 - `reference/values-and-schema.md` — values.yaml section order + values.schema.json structure
+- `reference/values-docs.md` — generate `PARAMETERS.md` (values reference) from `## @param` metadata; dependency-free generator + optional Bitnami `readme-generator-for-helm`
 - `reference/templates/` — every template file body (with `CHARTNAME` placeholder)
 - `reference/quality-gates.md` — kube-linter + kube-score install, commands, failure→fix table
