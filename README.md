@@ -11,7 +11,7 @@ your agent's skills directory with [`deploy.sh`](#install).
 
 | Skill | What it does |
 |-------|--------------|
-| [`helm-chart-creator`](skills/helm-chart-creator/) | Interviews you, then generates a production-grade, self-contained Helm chart (Bitnami conventions inlined — no OCI dependency) with security hardening, multi-environment values (dev/uat/prod), a `values.schema.json`, and validates the output with `kube-linter` + `kube-score`. Built for non-experts: every question has a default, an example, and explain-on-demand. |
+| [`helm-chart-creator`](skills/helm-chart-creator/) | Interviews you, then generates a production-grade, self-contained Helm chart (Bitnami conventions inlined — no OCI dependency) with security hardening, multi-environment values (dev/uat/prod), a `values.schema.json`, and validates the output with `kube-linter` + `kube-score`. Built for non-experts: every question has a default, an example, and explain-on-demand. The interview is a **blocking gate** — it never assumes defaults silently. Also runs an **improve mode** that audits and hardens an *existing* chart without changing its structure, presenting a proposal list first. Output is **deterministic** (templates copied verbatim) with a [test harness](skills/helm-chart-creator/tests/) to verify it. |
 
 ## Install
 
@@ -62,6 +62,10 @@ task and the skill triggers. You can also call it explicitly:
   `helm-chart-creator` skill directly.
 - **Copilot CLI:** `Use the /helm-chart-creator skill to chart my service`
   (a leading `/` plus the skill name selects it).
+- **Improve an existing chart:** point it at a directory that already contains a
+  `Chart.yaml` (e.g. `Harden my existing chart in ./charts/api`). It audits the
+  chart, shows a proposal list grouped by severity, asks only the questions it
+  can't answer from the chart, and applies fixes in place without restructuring.
 
 Verify what's installed:
 
@@ -78,12 +82,17 @@ claude-skills/
 ├── deploy.sh                       # copy skills -> agent skills dir(s)
 └── skills/
     └── helm-chart-creator/
-        ├── SKILL.md                # orchestration: interview, modes, quality gates
-        └── reference/              # loaded on demand by the agent
-            ├── explanations.md     # question catalog + "what is X" explainers
-            ├── values-and-schema.md
-            ├── quality-gates.md
-            └── templates/          # every chart file (CHARTNAME placeholder)
+        ├── SKILL.md                # orchestration: interview gate, create/improve modes, quality gates
+        ├── reference/              # loaded on demand by the agent
+        │   ├── explanations.md     # question catalog + "what is X" explainers
+        │   ├── improve-existing.md # improve-mode audit checklist + proposal format
+        │   ├── values-and-schema.md
+        │   ├── quality-gates.md
+        │   └── templates/          # every chart file (CHARTNAME placeholder)
+        └── tests/                  # platform-neutral determinism harness
+            ├── compare-charts.sh   # diff two charts; PASS if ≥95% identical
+            ├── run-determinism.sh  # run a scenario N times on any agent CLI, then compare
+            └── scenario-a.*        # fixed interview answers (prompt + human-readable)
 ```
 
 ## Adding a new skill

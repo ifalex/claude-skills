@@ -1,0 +1,3 @@
+# Generated chart output from determinism runs — never commit.
+run*/
+helm-determinism-runs/
