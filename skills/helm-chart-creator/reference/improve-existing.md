@@ -24,8 +24,8 @@ For each item, determine the chart's current state from the inventory, then clas
 | 2 | **Dropped capabilities** | `containerSecurityContext.capabilities.drop: [ALL]` | Critical | Derivable |
 | 3 | **`readOnlyRootFilesystem`** | set `true` + writable `emptyDir` for `/tmp` etc. | High | Needs answer (Q4.2 — which paths the app writes) |
 | 4 | **`allowPrivilegeEscalation: false`** | container securityContext | High | Derivable |
-| 5 | **Resource requests + limits** | `resources.requests/limits` (cpu, memory) | High | Needs answer (sizing) — offer presets nano/small/medium |
-| 6 | **Liveness / readiness probes** | `livenessProbe`, `readinessProbe` on the container | High | Needs answer (Q1.5 path/port) |
+| 5 | **Resource requests + limits** | `resources.requests/limits` (cpu, memory) | High | Derivable via overlay presets (`resourcesPreset` nano/small/explicit — see `explanations.md` § Environment overlays); confirm sizing only if the app has explicit needs |
+| 6 | **Liveness / readiness probes** | `livenessProbe`, `readinessProbe` on the container | High | Port derivable from `containerPort` (Q1.5); health **path** has no preset question — ask directly |
 | 7 | **Values schema** | `values.schema.json` present + covers top-level keys | Medium | Derivable from existing values |
 | 8 | **Multi-env overlays** | `values-dev/uat/prod.yaml` present | Medium | Derivable (generate overlays with diffs only) |
 | 9 | **helm-docs `# --` comments** | leaf keys in `values.yaml` documented | Low | Derivable |
@@ -50,8 +50,8 @@ Only ask for gaps that aren't derivable from the chart. Reuse the exact question
 | Gap | Question(s) |
 |-----|-------------|
 | readOnlyRootFilesystem writable paths | Q4.2 |
-| resource sizing | Q3.x sizing / presets (nano/small/medium or explicit) |
-| probe path & port | Q1.5 |
+| resource sizing | overlay `resourcesPreset` (nano/small/explicit) — see `explanations.md` § Environment overlays; ask only if the app needs explicit cpu/memory values |
+| probe health path | ask directly (no preset question); probe **port** = container port (Q1.5) |
 | ServiceAccount / IAM annotations | Q4.3 |
 | PDB minAvailable | Q3.4 |
 | HPA min/max/target | Q3.3 |
@@ -75,9 +75,11 @@ Present before doing any edits. Group by severity, highest first:
 - [ ] **No dropped capabilities** — Proposed: `capabilities.drop: [ALL]`. (auto-applicable)
 
 ### High
-- [ ] **No resource limits** — Proposed: add requests/limits.
-      NEEDS ANSWER: pick a size (nano / small / medium) or give explicit values.
-- [ ] **No readiness/liveness probes** — NEEDS ANSWER: health path & port?
+- [ ] **No resource limits** — Proposed: add requests/limits via overlay
+      `resourcesPreset` (nano dev / small uat / explicit prod). (auto-applicable;
+      override the size if the app needs explicit values)
+- [ ] **No readiness/liveness probes** — Proposed: add probes on the container
+      port. NEEDS ANSWER: health path? (port = containerPort)
 
 ### Medium
 - [ ] No `values.schema.json` — Proposed: generate from current values. (auto-applicable)
