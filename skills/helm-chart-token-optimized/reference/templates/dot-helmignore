@@ -1,0 +1,14 @@
+# Rename to .helmignore in the generated chart.
+# Patterns to ignore when building Helm packages.
+.DS_Store
+.git/
+.gitignore
+*.tmproj
+*.bak
+*.swp
+*.orig
+.idea/
+.vscode/
+*.tgz
+.editorconfig
+README.md.gotmpl

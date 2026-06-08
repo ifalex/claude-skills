@@ -1,0 +1,35 @@
+{{- /* Requires the Prometheus Operator CRDs. Emit only when metrics + serviceMonitor enabled. */ -}}
+{{- if and .Values.metrics.enabled .Values.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "CHARTNAME.fullname" . }}
+  namespace: {{ default (include "CHARTNAME.namespace" .) .Values.metrics.serviceMonitor.namespace | quote }}
+  labels: {{- include "CHARTNAME.labels" . | nindent 4 }}
+    {{- with .Values.metrics.serviceMonitor.labels }}{{- toYaml . | nindent 4 }}{{- end }}
+  {{- with .Values.commonAnnotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels: {{- include "CHARTNAME.selectorLabels" . | nindent 6 }}
+      {{- with .Values.metrics.serviceMonitor.selector }}{{- toYaml . | nindent 6 }}{{- end }}
+  endpoints:
+    - port: metrics
+      {{- with .Values.metrics.serviceMonitor.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.metrics.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+      honorLabels: {{ .Values.metrics.serviceMonitor.honorLabels }}
+      {{- with .Values.metrics.serviceMonitor.relabelings }}
+      relabelings: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.metrics.serviceMonitor.metricRelabelings }}
+      metricRelabelings: {{- toYaml . | nindent 8 }}
+      {{- end }}
+  namespaceSelector:
+    matchNames:
+      - {{ include "CHARTNAME.namespace" . }}
+{{- end }}

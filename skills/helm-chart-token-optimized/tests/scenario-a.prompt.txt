@@ -1,0 +1,18 @@
+Use the helm-chart-token-optimized skill to generate a Helm chart in the CURRENT
+working directory. Treat the list below as the COMPLETE set of interview answers
+— do not stop to ask questions; apply production defaults for anything not listed.
+Write an answers.env from these and run scaffold.sh (do not hand-write templates).
+
+  - App name: orders-api
+  - Description: Orders REST API
+  - App version: 2.3.0
+  - Image: registry docker.io, repository acme/orders-api, tag 2.3.0
+  - Container port: 8080, protocol TCP
+  - Workload type: Deployment
+  - Service type: ClusterIP
+  - Ingress: no
+  - Persistence: no
+  - Everything else: use safe production defaults
+
+Write the chart into ./orders-api/ relative to the current working directory.
+Run the quality gates but do not prompt for confirmation.

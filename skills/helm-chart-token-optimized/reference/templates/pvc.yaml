@@ -1,0 +1,26 @@
+{{- /* Standalone PVC — emit ONLY for a Deployment with persistence.enabled=true.
+       StatefulSets use volumeClaimTemplates instead; do NOT emit this for them. */ -}}
+{{- if .Values.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "CHARTNAME.fullname" . }}
+  namespace: {{ include "CHARTNAME.namespace" . | quote }}
+  labels: {{- include "CHARTNAME.labels" . | nindent 4 }}
+  {{- if or .Values.persistence.annotations .Values.commonAnnotations }}
+  annotations:
+    {{- with .Values.commonAnnotations }}{{- toYaml . | nindent 4 }}{{- end }}
+    {{- with .Values.persistence.annotations }}{{- toYaml . | nindent 4 }}{{- end }}
+  {{- end }}
+spec:
+  accessModes: {{- toYaml .Values.persistence.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size | quote }}
+  {{- if .Values.persistence.storageClass }}
+  storageClassName: {{ .Values.persistence.storageClass | quote }}
+  {{- end }}
+  {{- with .Values.persistence.selector }}
+  selector: {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

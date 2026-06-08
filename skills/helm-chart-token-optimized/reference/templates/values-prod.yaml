@@ -1,0 +1,45 @@
+# prod overlay — apply with:  -f values.yaml -f values-prod.yaml
+# Only DIFFS from the common values.yaml belong here.
+
+replicaCount: 3
+
+image:
+  pullPolicy: IfNotPresent
+
+# Explicit requests AND limits in prod (do not rely on a preset).
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+    ephemeral-storage: 50Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+    ephemeral-storage: 2Gi
+
+podAntiAffinityPreset: soft   # set "hard" to force one pod per node
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPU: 80
+
+pdb:
+  create: true
+  minAvailable: 2
+
+networkPolicy:
+  enabled: true
+  allowExternal: true
+
+ingress:
+  enabled: false
+  # tls: true
+  # ingressClassName: nginx
+  # annotations:
+  #   cert-manager.io/cluster-issuer: letsencrypt-prod
+
+# extraEnvVars:
+#   - name: LOG_LEVEL
+#     value: warn

@@ -1,0 +1,285 @@
+# values.yaml — rendered by scaffold.sh from answers.env.
+# helm-docs `# --` comments sit directly above each documented leaf key.
+
+## @section Global parameters
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+
+## @section Common parameters
+# -- String to partially override the fullname (keeps the release name prefix)
+nameOverride: ""
+# -- String to fully override the generated fullname
+fullnameOverride: ""
+# -- Override the deployment namespace
+namespaceOverride: ""
+# -- Kubernetes cluster domain
+clusterDomain: cluster.local
+# -- Labels to add to all deployed objects
+commonLabels: {}
+# -- Annotations to add to all deployed objects
+commonAnnotations: {}
+diagnosticMode:
+  # -- Replace the container entrypoint with sleep for debugging
+  enabled: false
+  command: ["sleep"]
+  args: ["infinity"]
+
+## @section Image parameters
+image:
+  # -- Container image registry
+  registry: %%IMAGE_REGISTRY%%
+  # -- Container image repository
+  repository: %%IMAGE_REPOSITORY%%
+  # -- Container image tag (immutable tags are recommended)
+  tag: "%%IMAGE_TAG%%"
+  # -- Container image digest (overrides tag when set), e.g. sha256:...
+  digest: ""
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+  # -- Image pull secrets
+  pullSecrets: []
+
+## @section Workload parameters
+# -- Number of replicas (ignored when autoscaling.enabled=true)
+replicaCount: %%REPLICA_COUNT%%
+# -- Number of old ReplicaSets to retain
+revisionHistoryLimit: 10
+updateStrategy:
+  # -- Update strategy type
+  type: RollingUpdate
+  rollingUpdate: {}
+# -- Extra pod labels
+podLabels: {}
+# -- Extra pod annotations
+podAnnotations: {}
+# -- Mount the ServiceAccount token into the pod
+automountServiceAccountToken: false
+hostAliases: []
+# -- Override the container entrypoint
+command: []
+# -- Override the container args
+args: []
+# -- Extra environment variables (plain)
+extraEnvVars: []
+# -- Name of an existing ConfigMap with extra env vars
+extraEnvVarsCM: ""
+# -- Name of an existing Secret with extra env vars
+extraEnvVarsSecret: ""
+extraVolumes: []
+extraVolumeMounts: []
+initContainers: []
+sidecars: []
+
+## @section Scheduling
+podAffinityPreset: ""
+# -- Pod anti-affinity preset (""/soft/hard)
+podAntiAffinityPreset: soft
+nodeAffinityPreset:
+  type: ""
+  key: ""
+  values: []
+affinity: {}
+nodeSelector: {}
+tolerations: []
+topologySpreadConstraints: []
+priorityClassName: ""
+schedulerName: ""
+terminationGracePeriodSeconds: ""
+
+## @section Security
+podSecurityContext:
+  # -- Enable pod-level security context
+  enabled: true
+  # -- Group ID for the volume filesystem
+  fsGroup: %%RUN_AS_USER%%
+  fsGroupChangePolicy: Always
+  supplementalGroups: []
+  sysctls: []
+containerSecurityContext:
+  # -- Enable container-level security context
+  enabled: true
+  seLinuxOptions: {}
+  # -- UID the container process runs as
+  runAsUser: %%RUN_AS_USER%%
+  # -- GID the container process runs as
+  runAsGroup: %%RUN_AS_USER%%
+  # -- Require the container to run as a non-root user
+  runAsNonRoot: true
+  privileged: false
+  # -- Mount the container root filesystem read-only
+  readOnlyRootFilesystem: %%READ_ONLY_ROOT_FS%%
+  # -- Disallow privilege escalation
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+## @section Container ports / resources / probes
+containerPorts:
+  # -- Container port the application listens on
+  http: %%CONTAINER_PORT%%
+# -- Explicit resource requests/limits (takes precedence over resourcesPreset)
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+    ephemeral-storage: 50Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+    ephemeral-storage: 1Gi
+# -- Resource preset used only when resources is {} (nano/small/medium/...)
+resourcesPreset: "nano"
+livenessProbe:
+  # -- Enable the liveness probe (TCP on the container port by default)
+  enabled: true
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+readinessProbe:
+  # -- Enable the readiness probe (TCP on the container port by default)
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+startupProbe:
+  # -- Enable the startup probe
+  enabled: false
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+  successThreshold: 1
+# -- Custom liveness probe (overrides the generated one)
+customLivenessProbe: {}
+# -- Custom readiness probe (overrides the generated one)
+customReadinessProbe: {}
+# -- Custom startup probe (overrides the generated one)
+customStartupProbe: {}
+lifecycleHooks: {}
+
+## @section Traffic exposure
+service:
+  # -- Service type (ClusterIP/NodePort/LoadBalancer)
+  type: %%SERVICE_TYPE%%
+  ports:
+    # -- Service port
+    http: %%SERVICE_PORT%%
+  nodePorts:
+    http: ""
+  clusterIP: ""
+  loadBalancerIP: ""
+  loadBalancerSourceRanges: []
+  externalTrafficPolicy: Cluster
+  sessionAffinity: None
+  annotations: {}
+  extraPorts: []
+ingress:
+  # -- Enable ingress
+  enabled: %%INGRESS_ENABLED%%
+  # -- IngressClass name
+  ingressClassName: "%%INGRESS_CLASS%%"
+  # -- Ingress hostname
+  hostname: %%INGRESS_HOSTNAME%%
+  path: /
+  pathType: ImplementationSpecific
+  annotations: {}
+  # -- Enable TLS on the ingress
+  tls: %%INGRESS_TLS_BOOL%%
+  # -- Generate a self-signed certificate instead of cert-manager
+  selfSigned: %%INGRESS_SELFSIGNED_BOOL%%
+  extraHosts: []
+  extraPaths: []
+  extraTls: []
+  secrets: []
+
+## @section Persistence
+persistence:
+  # -- Enable persistent storage (PVC for Deployment, volumeClaimTemplates for StatefulSet)
+  enabled: %%PERSISTENCE_ENABLED%%
+  storageClass: ""
+  accessModes: ["ReadWriteOnce"]
+  # -- Volume size
+  size: %%PERSISTENCE_SIZE%%
+  annotations: {}
+  # -- Mount path inside the container
+  mountPath: %%PERSISTENCE_MOUNT%%
+  selector: {}
+
+## @section RBAC / ServiceAccount
+serviceAccount:
+  # -- Create a dedicated ServiceAccount
+  create: %%SA_CREATE%%
+  # -- Name of the ServiceAccount (generated if empty)
+  name: ""
+  # -- ServiceAccount annotations (e.g. IAM role / Workload Identity)
+  annotations: {}
+  automountServiceAccountToken: false
+rbac:
+  create: false
+  rules: []
+
+## @section Autoscaling / Disruption
+autoscaling:
+  # -- Enable the HorizontalPodAutoscaler
+  enabled: %%HPA_ENABLED%%
+  # -- Minimum replicas
+  minReplicas: %%HPA_MIN%%
+  # -- Maximum replicas
+  maxReplicas: %%HPA_MAX%%
+  # -- Target average CPU utilization (%)
+  targetCPU: %%HPA_TARGET_CPU%%
+  targetMemory: ""
+pdb:
+  # -- Create a PodDisruptionBudget
+  create: %%PDB_ENABLED%%
+  # -- Minimum available pods during disruption
+  minAvailable: %%PDB_MIN_AVAILABLE%%
+  maxUnavailable: ""
+
+## @section Network policy
+networkPolicy:
+  # -- Enable a NetworkPolicy
+  enabled: %%NETWORKPOLICY_ENABLED%%
+  allowExternal: true
+  allowExternalEgress: true
+  extraIngress: []
+  extraEgress: []
+  ingressNSMatchLabels: {}
+  ingressNSPodMatchLabels: {}
+
+## @section Metrics
+metrics:
+  # -- Expose a metrics endpoint
+  enabled: %%METRICS_ENABLED%%
+  service:
+    ports:
+      # -- Metrics port
+      metrics: %%METRICS_PORT%%
+  serviceMonitor:
+    # -- Create a Prometheus Operator ServiceMonitor
+    enabled: %%SERVICEMONITOR_ENABLED%%
+    namespace: ""
+    interval: 30s
+    scrapeTimeout: ""
+    labels: {}
+    selector: {}
+    relabelings: []
+    metricRelabelings: []
+    honorLabels: false
+
+## @section ConfigMap (app config)
+# -- Inline app configuration file content
+configuration: ""
+# -- Name of an existing ConfigMap to mount instead
+existingConfigmap: ""
+
+## @section Extra deploy
+extraDeploy: []

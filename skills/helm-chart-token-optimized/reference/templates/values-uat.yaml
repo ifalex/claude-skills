@@ -1,0 +1,33 @@
+# uat overlay — apply with:  -f values.yaml -f values-uat.yaml
+# Only DIFFS from the common values.yaml belong here.
+
+replicaCount: 2
+
+image:
+  pullPolicy: IfNotPresent
+
+resources: {}
+resourcesPreset: "small"
+
+podAntiAffinityPreset: soft
+
+autoscaling:
+  enabled: false
+
+pdb:
+  create: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+  allowExternal: true
+
+ingress:
+  enabled: false
+  # tls: true
+  # annotations:
+  #   cert-manager.io/cluster-issuer: letsencrypt-staging
+
+# extraEnvVars:
+#   - name: LOG_LEVEL
+#     value: info
