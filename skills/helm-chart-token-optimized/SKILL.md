@@ -1,6 +1,6 @@
 ---
 name: helm-chart-token-optimized
-description: Token-lean, deterministic variant of helm-chart-creator. Use when creating a Helm chart for a Kubernetes application, scaffolding a new chart, or converting an app/Deployment/Docker image to Helm and you want minimal token usage with byte-identical repeatable output. Runs a short tiered interview, then generates the chart with a bundled scaffold.sh (templates never pass through the model's context). Produces production-grade templates with security hardening, multi-environment values (dev/uat/prod), values schema, and kube-linter/kube-score validation.
+description: Token-lean, deterministic variant of helm-chart-creator. Use when creating a Helm chart, scaffolding a chart, or converting an app/Deployment/Docker image to Helm and you want minimal token usage with byte-identical, repeatable output. Runs a short tiered interview, then generates a production-grade chart (security hardening, multi-env values dev/uat/prod, values schema, kube-linter/kube-score) via a bundled scaffold.sh so templates never enter context. Also audits/hardens an existing chart.
 ---
 
 # Helm Chart Creator — token-optimized
@@ -127,27 +127,19 @@ Compact summary below. Full question text, defaults, examples, and "what is X" e
 
 ## Mode: Improve Existing Chart
 
-Triggered when the target already contains a `Chart.yaml`. Goal: **raise an existing chart to these best practices without changing its structure.** Full audit checklist, gap→question mapping, and the proposal-report format live in **`reference/improve-existing.md`** — read it before starting. Procedure:
-
-1. **Inventory (read-only).** Read `Chart.yaml`, `values.yaml`, every file under `templates/`, any `values.schema.json`, and any env overlays. Map the chart's naming scheme, layout, and which best-practice features it already has. Do not write anything yet.
-2. **Audit** against the checklist in `reference/improve-existing.md` (security context, probes, resource requests/limits, values schema, multi-env overlays, helm-docs `# --` comments, PDB/HPA, NetworkPolicy, ServiceAccount token automount, image tag immutability, …). Classify each gap **Critical / High / Medium / Low**.
-3. **Preserve structure (non-negotiable).** Do NOT rename files, move or split templates, reorder `values.yaml` keys, or change the release/helper naming scheme. Improvements must be **additive or in-place field edits** that fit the existing layout. If a best practice would require restructuring, list it as a *proposal* — never impose it.
-4. **Proposal report.** Present gaps grouped by severity. For each: what's missing, why it matters, the exact proposed change, and whether it's **auto-applicable** (derivable from the chart) or **needs a user answer**.
-5. **Ask only the gap-filling questions.** For gaps not derivable from the existing chart, ask the relevant question-group questions (reuse `reference/explanations.md`) — only the ones the chart doesn't already answer. **Same blocking gate as Step 0:** do not edit files until the user approves the proposal and answers the open questions (or explicitly says "apply the auto-fixable ones, skip the rest").
-6. **Apply in place.** Edit the existing files to implement approved changes, matching the surrounding indentation and style. Copy any *new* template files verbatim from `reference/templates/` (CHARTNAME substituted), adapting names to the existing chart's convention.
-7. **Quality gates + summary** — run the same gates as Create mode and report a clear **before → after** of what changed.
+Triggered when the target already contains a `Chart.yaml`. Goal: **raise an existing chart to these best practices without changing its structure** — do NOT scaffold a fresh chart over an existing one. The full procedure (read-only inventory → audit → preserve-structure rules → proposal report → gap-filling questions → in-place apply → quality gates), the audit checklist, the gap→question mapping, and the proposal-report format all live in **`reference/improve-existing.md`** — **read it before touching anything in this mode**. The same blocking interview gate as Step 0 applies: no file edits until the user approves the proposal and answers the open questions.
 
 ## Generation Procedure (script-based — this is the token-saving core)
 
 After the interview, **do not write template files by hand.** Run the bundled scaffold so template bodies never enter context:
 
-1. **Confirm the plan once** — list chart name, workload type, every enabled feature, and the security defaults applied (non-root, readOnlyRootFilesystem, dropped caps, resource limits, probes). Get one yes.
-2. **Write `answers.env`** — a small KEY=VALUE file mapping the interview answers to the keys in `answers.example.env`. Only this tiny file passes through context. Required: `CHART_NAME`, `IMAGE_REPOSITORY`, `IMAGE_TAG`; everything else has a safe default (omit a line to accept it). Map the toggles: `INGRESS_ENABLED`, `PERSISTENCE_ENABLED`, `HPA_ENABLED`, `PDB_ENABLED`, `NETWORKPOLICY_ENABLED`, `METRICS_ENABLED`, `SERVICEMONITOR_ENABLED`, `SECRETS_ENABLED`, `CONFIGMAP_ENABLED`.
+1. **Write `answers.env`** — a small KEY=VALUE file mapping the interview answers to the keys in `answers.example.env`. Only this tiny file passes through context. Required: `CHART_NAME`, `IMAGE_REPOSITORY`, `IMAGE_TAG`; everything else has a safe default (omit a line to accept it). Map the toggles: `INGRESS_ENABLED`, `PERSISTENCE_ENABLED`, `HPA_ENABLED`, `PDB_ENABLED`, `NETWORKPOLICY_ENABLED`, `METRICS_ENABLED`, `SERVICEMONITOR_ENABLED`, `SECRETS_ENABLED`, `CONFIGMAP_ENABLED`.
+2. **Confirm the plan once** — run `scaffold.sh --answers answers.env --plan` to print a deterministic summary (chart name, workload, enabled features, security defaults applied) and relay it for one yes. (`--plan` writes nothing.) Get the yes before the real run.
 3. **Run the scaffold:**
    ```bash
    bash <skill-dir>/scaffold.sh --answers answers.env --out <target-dir>
    ```
-   It writes `<target-dir>/<chart-name>/` with: `Chart.yaml`, `values.yaml` (rendered, with helm-docs `# --` comments), `values.schema.json`, `values-{dev,uat,prod}.yaml`, `.helmignore`, the chosen workload template, `service`/`serviceaccount`/`NOTES`/`extra-list`/`_helpers`, plus only the conditional templates the toggles enabled. It validates inputs (kebab-case name, valid workload/service type) and substitutes `CHARTNAME` + all `%%...%%` placeholders. **Do not read the emitted template bodies** — trust the copy.
+   It writes `<target-dir>/<chart-name>/` with: `Chart.yaml`, `values.yaml` (rendered, with helm-docs `# --` comments), `values.schema.json`, `values-{dev,uat,prod}.yaml`, `.helmignore`, the chosen workload template, `service`/`serviceaccount`/`NOTES`/`extra-list`/`_helpers`, plus the feature templates (`ingress`, `pdb`, `networkpolicy`, `servicemonitor`, and `hpa` for Deployments). Each feature template **self-guards on its value** (renders nothing when off), so the env overlays can enable hardening — PDB, NetworkPolicy, HPA — in **prod even if the toggle was off at generation time**; the toggle only sets the default in `values.yaml`. It validates inputs (kebab-case name, valid workload/service type) and substitutes `CHARTNAME` + all `%%...%%` placeholders. **Do not read the emitted template bodies** — trust the copy.
 4. **Review only `values.yaml`** with the user if they want to tweak specifics (the rendered file is small and is the only place answer-specific values live). Edit values in place; never regenerate templates.
 5. **Generate `README.md` with helm-docs** — `helm-docs --chart-search-root=./<chart>` writes the `## Values` table from the `# --` comments. If helm-docs isn't installed, offer `brew install norwoodj/tap/helm-docs` (or `go install`); if it can't be installed, **say the README was skipped — don't hand-fake the table**. (Avoid `-x` strict mode as a gate — see `reference/helm-docs.md`.)
 6. **Run quality gates** (next section). Fix until clean.
@@ -163,7 +155,7 @@ Full commands, install instructions, and the failure→fix table are in **`refer
 
 1. `helm lint <chart>/` and `helm template <chart>/ -f <chart>/values-prod.yaml` must both succeed (catches template/syntax errors).
 2. If `kube-linter` / `kube-score` are installed, run them on the rendered prod manifests. If not installed, offer to `brew install kube-linter kube-score` (or document it) and fall back to `helm lint` + a manual review against the fix table.
-3. **Fix every CRITICAL/HIGH finding** by adjusting templates or values, then re-run. Verified baseline: the default chart passes **kube-linter with 0 errors**. **kube-score** is stricter and flags 4 things on defaults (ephemeral-storage, identical probes, UID<10000, pull policy) — `reference/quality-gates.md` lists the exact resolution for each and which are safe to suppress. Reach 0 CRITICAL before declaring done.
+3. **Fix every CRITICAL/HIGH finding** by adjusting templates or values, then re-run. Verified baseline: the default chart passes **kube-linter with 0 errors**, and the **uat and prod overlays score 0 kube-score CRITICAL out of the box** (UID 10001, `pullPolicy: Always`, NetworkPolicy + PDB enabled, ephemeral-storage set, identical-probes scoped-ignored). Run kube-score against `values-prod.yaml`/`values-uat.yaml` — those are the deploy targets. The **dev** overlay is intentionally permissive (single-replica SIT, NetworkPolicy off) and is *expected* to show one CRITICAL (Pod NetworkPolicy) — that's by design. `reference/quality-gates.md` explains how each finding is handled. Reach 0 CRITICAL on uat/prod before declaring done.
 4. Report the final tool output verbatim. If a check was skipped (tool not installed), say so — don't imply it passed.
 
 ## Common Mistakes
@@ -185,7 +177,7 @@ Full commands, install instructions, and the failure→fix table are in **`refer
 
 ## Reference Files
 
-- `scaffold.sh` — **the generator.** Reads `answers.env`, copies templates + renders `values.yaml` on disk. Run it instead of hand-writing files. `--help` for usage; `--dry-run` to preview the file list.
+- `scaffold.sh` — **the generator.** Reads `answers.env`, copies templates + renders `values.yaml` on disk. Run it instead of hand-writing files. `--help` for usage; `--dry-run` to preview the file list; `--plan` to print the confirmation summary (writes nothing).
 - `answers.example.env` — the answer-file template (hand this to a user for the paste-in-one-shot path; copy + fill to drive the scaffold).
 - `reference/templates/values.yaml.tmpl` — the `values.yaml` source with `%%...%%` placeholders and helm-docs `# --` comments (rendered by the scaffold; used directly only in the no-shell fallback).
 - `reference/templates/` — every template body (`CHARTNAME` placeholder) + `values.schema.json` + the env overlays.

@@ -1,11 +1,46 @@
 # values.yaml Structure & Schema
 
+> **Single source of truth:** the canonical `values.yaml` is
+> `reference/templates/values.yaml.tmpl` and the canonical schema is
+> `reference/templates/values.schema.json`. `scaffold.sh` renders from them.
+> **Read those files for the full structure** — this doc only records the
+> *conventions* (section order, helm-docs comments, schema coverage) so it can't
+> drift out of sync with the templates. When hand-editing or in the no-shell
+> fallback, copy from the template and apply the rules below.
+
 ## Section order (follow exactly — Bitnami convention)
 
-Always emit sections in this order. The `## @section <Title>` lines are human-readable dividers. Document each value with a **helm-docs `# -- <description>` comment on the line directly above its leaf key** — this is what generates the `README.md` values table (see `helm-docs.md`). Example:
+Emit `## @section <Title>` dividers in this order (this is the order in
+`values.yaml.tmpl`):
+
+1. Global parameters
+2. Common parameters
+3. Image parameters
+4. Workload parameters
+5. Scheduling
+6. Security
+7. Container ports / resources / probes
+8. Traffic exposure
+9. Persistence
+10. RBAC / ServiceAccount
+11. Autoscaling / Disruption
+12. Network policy
+13. Metrics
+14. ConfigMap (app config)
+15. Extra deploy
+
+It's fine to keep disabled-feature sections in `values.yaml` as documented
+toggles (Bitnami does). Adjust default values to the user's answers — but never
+reorder or rename keys.
+
+## helm-docs `# --` comments
+
+Document each value with a **helm-docs `# -- <description>` comment on the line
+directly above its leaf key** — this is what generates the `README.md` values
+table (see `helm-docs.md`). Example:
 
 ```yaml
-## @section <App> image parameters
+## @section Image parameters
 image:
   # -- Container image registry
   registry: docker.io
@@ -15,292 +50,31 @@ image:
   tag: "<tag>"
 ```
 
-Use `# -- (type) ...` hints on empty values, `# @default -- ...` to override a shown default, and `# @ignored` to hide a value. Do **not** put a `# --` on a parent key unless you want the whole block documented as one row (it suppresses the nested leaves). The skeleton below omits per-leaf `# --` comments for brevity — add them when emitting.
+Rules:
 
-```yaml
-# Copyright / license header (optional)
+- Use `# -- (type) ...` hints on empty values (e.g. `# -- (string)` above `tag: ""`).
+- Use `# @default -- ...` to override the shown default in the table.
+- Use `# @ignored` to hide a value from the table.
+- Do **not** put a `# --` on a *parent* key unless you want the whole block
+  documented as one row — it suppresses the nested leaves. Comment only the
+  leaves you want shown.
 
-## @section Global parameters
-global:
-  imageRegistry: ""
-  imagePullSecrets: []
-  storageClass: ""
-
-## @section Common parameters
-nameOverride: ""
-fullnameOverride: ""
-namespaceOverride: ""
-clusterDomain: cluster.local
-commonLabels: {}
-commonAnnotations: {}
-diagnosticMode:
-  enabled: false
-  command: ["sleep"]
-  args: ["infinity"]
-
-## @section <App> image parameters
-image:
-  registry: docker.io
-  repository: <repo>
-  tag: "<tag>"
-  digest: ""
-  pullPolicy: IfNotPresent
-  pullSecrets: []
-
-## @section <App> deployment/workload parameters
-replicaCount: 1
-revisionHistoryLimit: 10
-updateStrategy:
-  type: RollingUpdate
-  rollingUpdate: {}
-podLabels: {}
-podAnnotations: {}
-automountServiceAccountToken: false
-hostAliases: []
-command: []
-args: []
-extraEnvVars: []
-extraEnvVarsCM: ""
-extraEnvVarsSecret: ""
-extraVolumes: []
-extraVolumeMounts: []
-initContainers: []
-sidecars: []
-
-## @section Scheduling
-podAffinityPreset: ""
-podAntiAffinityPreset: soft
-nodeAffinityPreset:
-  type: ""
-  key: ""
-  values: []
-affinity: {}
-nodeSelector: {}
-tolerations: []
-topologySpreadConstraints: []
-priorityClassName: ""
-schedulerName: ""
-terminationGracePeriodSeconds: ""
-
-## @section Security
-podSecurityContext:
-  enabled: true
-  fsGroup: 1001
-  fsGroupChangePolicy: Always
-  supplementalGroups: []
-  sysctls: []
-containerSecurityContext:
-  enabled: true
-  seLinuxOptions: {}
-  runAsUser: 1001
-  runAsGroup: 1001
-  runAsNonRoot: true
-  privileged: false
-  readOnlyRootFilesystem: true
-  allowPrivilegeEscalation: false
-  capabilities:
-    drop: ["ALL"]
-  seccompProfile:
-    type: RuntimeDefault
-
-## @section Container ports / resources / probes
-containerPorts:
-  http: 8080
-resources:
-  requests:
-    cpu: 100m
-    memory: 128Mi
-    ephemeral-storage: 50Mi    # kube-score requires this; harmless on all clusters
-  limits:
-    cpu: 500m
-    memory: 512Mi
-    ephemeral-storage: 1Gi
-resourcesPreset: "nano"   # used only when resources is {}; presets also include ephemeral-storage
-livenessProbe:
-  enabled: true
-  initialDelaySeconds: 10
-  periodSeconds: 10
-  timeoutSeconds: 5
-  failureThreshold: 6
-  successThreshold: 1
-readinessProbe:
-  enabled: true
-  initialDelaySeconds: 5
-  periodSeconds: 10
-  timeoutSeconds: 5
-  failureThreshold: 6
-  successThreshold: 1
-startupProbe:
-  enabled: false
-  initialDelaySeconds: 0
-  periodSeconds: 10
-  timeoutSeconds: 5
-  failureThreshold: 30
-  successThreshold: 1
-customLivenessProbe: {}
-customReadinessProbe: {}
-customStartupProbe: {}
-lifecycleHooks: {}
-
-## @section Traffic exposure
-service:
-  type: ClusterIP
-  ports:
-    http: 80
-  nodePorts:
-    http: ""
-  clusterIP: ""
-  loadBalancerIP: ""
-  loadBalancerSourceRanges: []
-  externalTrafficPolicy: Cluster
-  sessionAffinity: None
-  annotations: {}
-  extraPorts: []
-ingress:
-  enabled: false
-  ingressClassName: ""
-  hostname: <app>.local
-  path: /
-  pathType: ImplementationSpecific
-  annotations: {}
-  tls: false
-  selfSigned: false
-  extraHosts: []
-  extraPaths: []
-  extraTls: []
-  secrets: []
-
-## @section Persistence  (StatefulSet, or Deployment if explicitly enabled)
-persistence:
-  enabled: false
-  storageClass: ""
-  accessModes: ["ReadWriteOnce"]
-  size: 8Gi
-  annotations: {}
-  mountPath: /data
-  selector: {}
-
-## @section RBAC / ServiceAccount
-serviceAccount:
-  create: true
-  name: ""
-  annotations: {}
-  automountServiceAccountToken: false
-rbac:
-  create: false
-  rules: []
-
-## @section Autoscaling / Disruption
-autoscaling:
-  enabled: false
-  minReplicas: 2
-  maxReplicas: 5
-  targetCPU: 80
-  targetMemory: ""
-pdb:
-  create: false
-  minAvailable: 1
-  maxUnavailable: ""
-
-## @section Network policy
-networkPolicy:
-  enabled: false
-  allowExternal: true
-  allowExternalEgress: true
-  extraIngress: []
-  extraEgress: []
-  ingressNSMatchLabels: {}
-  ingressNSPodMatchLabels: {}
-
-## @section Metrics
-metrics:
-  enabled: false
-  service:
-    ports:
-      metrics: 9090
-  serviceMonitor:
-    enabled: false
-    namespace: ""
-    interval: 30s
-    scrapeTimeout: ""
-    labels: {}
-    selector: {}
-    relabelings: []
-    metricRelabelings: []
-    honorLabels: false
-
-## @section ConfigMap (app config)
-configuration: ""           # inline file content, or
-existingConfigmap: ""
-
-## @section Extra deploy
-extraDeploy: []
-```
-
-Adjust defaults to the user's answers. It's fine to keep disabled-feature sections in values.yaml as documented toggles (Bitnami does).
+`values.yaml.tmpl` already carries these comments on the documented leaves; if
+you add a key, add its `# --` line too.
 
 ## values.schema.json
 
-Generate a JSON Schema (draft-07) validating the high-value fields. Minimum coverage: `image`, `service`, `ingress`, `resources`, `replicaCount`, `persistence`, `autoscaling`. Keep it permissive (do not set `additionalProperties: false` at root — charts evolve). Base skeleton:
+The canonical schema is `reference/templates/values.schema.json` (JSON Schema
+draft-07). Rules when extending it:
 
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "CHARTNAME values",
-  "type": "object",
-  "properties": {
-    "replicaCount": { "type": "integer", "minimum": 0 },
-    "image": {
-      "type": "object",
-      "properties": {
-        "registry":   { "type": "string" },
-        "repository": { "type": "string" },
-        "tag":        { "type": "string" },
-        "digest":     { "type": "string" },
-        "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
-      },
-      "required": ["repository"]
-    },
-    "service": {
-      "type": "object",
-      "properties": {
-        "type": { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
-        "ports": { "type": "object" }
-      }
-    },
-    "ingress": {
-      "type": "object",
-      "properties": {
-        "enabled":  { "type": "boolean" },
-        "hostname": { "type": "string" },
-        "tls":      { "type": "boolean" }
-      }
-    },
-    "resources": {
-      "type": "object",
-      "properties": {
-        "requests": { "type": "object" },
-        "limits":   { "type": "object" }
-      }
-    },
-    "persistence": {
-      "type": "object",
-      "properties": {
-        "enabled":     { "type": "boolean" },
-        "size":        { "type": "string" },
-        "storageClass":{ "type": "string" },
-        "accessModes": { "type": "array", "items": { "type": "string", "enum": ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany", "ReadWriteOncePod"] } }
-      }
-    },
-    "autoscaling": {
-      "type": "object",
-      "properties": {
-        "enabled":     { "type": "boolean" },
-        "minReplicas": { "type": "integer", "minimum": 1 },
-        "maxReplicas": { "type": "integer", "minimum": 1 },
-        "targetCPU":   { "type": ["integer", "string"] }
-      }
-    }
-  }
-}
-```
+- **Minimum coverage:** `image`, `service`, `ingress`, `resources`,
+  `replicaCount`, `persistence`, `autoscaling`. A new top-level value that users
+  set should get a matching property so `helm lint` validates it.
+- **Keep it permissive:** do **not** set `additionalProperties: false` at the
+  root — charts evolve and over-strict schemas reject valid overrides.
+- **Enums for closed sets:** `service.type`, `image.pullPolicy`,
+  `persistence.accessModes` — constrain to the valid Kubernetes values.
+- Keep the schema and `values.yaml.tmpl` in step: a value added to one should be
+  reflected in the other. The all-features lint test
+  (`tests/lint-all-features.sh`) exercises this by running `helm lint` with every
+  toggle enabled.

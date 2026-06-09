@@ -12,6 +12,7 @@ your agent's skills directory with [`deploy.sh`](#install).
 | Skill | What it does |
 |-------|--------------|
 | [`helm-chart-creator`](skills/helm-chart-creator/) | Interviews you, then generates a production-grade, self-contained Helm chart (Bitnami conventions inlined — no OCI dependency) with security hardening, multi-environment values (dev/uat/prod), a `values.schema.json`, and validates the output with `kube-linter` + `kube-score`. Built for non-experts: every question has a default, an example, and explain-on-demand. The interview is a **blocking gate** — it never assumes defaults silently. Also runs an **improve mode** that audits and hardens an *existing* chart without changing its structure, presenting a proposal list first. Output is **deterministic** (templates copied verbatim) with a [test harness](skills/helm-chart-creator/tests/) to verify it. |
+| [`helm-chart-token-optimized`](skills/helm-chart-token-optimized/) | **Token-lean, deterministic sibling** of `helm-chart-creator` — same production-grade output, but generation runs through a bundled `scaffold.sh` so template bodies never pass through the model's context (~40K tokens/chart saved). Short **tiered interview** (essentials first, full list on demand), confirmed once; same blocking gate and improve mode. Output is **byte-identical** for identical answers (`cp`+`sed`, not model text). The **uat/prod overlays pass `kube-score` with 0 CRITICAL and `kube-linter` clean out of the box** (non-root UID ≥10000, NetworkPolicy + PDB, always-pull, ephemeral-storage, replica-safe PDB). Ships a **no-model [test suite](skills/helm-chart-token-optimized/tests/)** (`run-all.sh`): determinism, placeholder/defaults parity, schema lint, and a kube-linter/kube-score quality gate. |
 
 ## Install
 
@@ -67,6 +68,12 @@ task and the skill triggers. You can also call it explicitly:
   chart, shows a proposal list grouped by severity, asks only the questions it
   can't answer from the chart, and applies fixes in place without restructuring.
 
+**Two flavours of the Helm chart skill:** `helm-chart-creator` (v1) writes the
+templates through the conversation; `helm-chart-token-optimized` (v2) hands a
+small answer file to a bundled `scaffold.sh` that renders on disk, so it uses far
+fewer tokens and is byte-deterministic — pick v2 for minimal token usage or
+CI-repeatable generation.
+
 Verify what's installed:
 
 ```bash
@@ -81,18 +88,31 @@ claude-skills/
 ├── README.md
 ├── deploy.sh                       # copy skills -> agent skills dir(s)
 └── skills/
-    └── helm-chart-creator/
-        ├── SKILL.md                # orchestration: interview gate, create/improve modes, quality gates
-        ├── reference/              # loaded on demand by the agent
-        │   ├── explanations.md     # question catalog + "what is X" explainers
-        │   ├── improve-existing.md # improve-mode audit checklist + proposal format
-        │   ├── values-and-schema.md
-        │   ├── quality-gates.md
-        │   └── templates/          # every chart file (CHARTNAME placeholder)
-        └── tests/                  # platform-neutral determinism harness
-            ├── compare-charts.sh   # diff two charts; PASS if ≥95% identical
-            ├── run-determinism.sh  # run a scenario N times on any agent CLI, then compare
-            └── scenario-a.*        # fixed interview answers (prompt + human-readable)
+    ├── helm-chart-creator/         # v1: writes templates through the conversation
+    │   ├── SKILL.md                # orchestration: interview gate, create/improve modes, quality gates
+    │   ├── reference/              # loaded on demand by the agent
+    │   │   ├── explanations.md     # question catalog + "what is X" explainers
+    │   │   ├── improve-existing.md # improve-mode audit checklist + proposal format
+    │   │   ├── values-and-schema.md
+    │   │   ├── quality-gates.md
+    │   │   └── templates/          # every chart file (CHARTNAME placeholder)
+    │   └── tests/                  # platform-neutral determinism harness
+    │       ├── compare-charts.sh   # diff two charts; PASS if ≥95% identical
+    │       ├── run-determinism.sh  # run a scenario N times on any agent CLI, then compare
+    │       └── scenario-a.*        # fixed interview answers (prompt + human-readable)
+    └── helm-chart-token-optimized/ # v2: renders on disk via scaffold.sh (token-lean, deterministic)
+        ├── SKILL.md                # tiered interview, --plan confirm, scaffold-based generation
+        ├── scaffold.sh             # deterministic cp+sed generator (templates never enter context)
+        ├── answers.example.env     # fill-in answer file (the only thing passed through context)
+        ├── reference/              # explanations, improve-existing, values-and-schema, quality-gates, templates/
+        ├── docs/further-proposals.md
+        └── tests/                  # no-model guard suite (run-all.sh)
+            ├── run-scaffold-determinism.sh # scaffold twice, byte-compare (+ render overlays)
+            ├── check-placeholder-parity.sh # %%X%% in tmpl <-> `add X` in scaffold.sh
+            ├── check-defaults-parity.sh    # answers.example.env keys <-> scaffold.sh vars
+            ├── lint-all-features.sh         # all toggles on; helm lint vs values.schema.json
+            ├── check-kube-quality.sh        # kube-linter clean + kube-score 0 CRITICAL (uat/prod)
+            └── check-deployed-sync.sh       # deployed copy vs repo (drift guard)
 ```
 
 ## Adding a new skill

@@ -4,7 +4,8 @@
 replicaCount: 2
 
 image:
-  pullPolicy: IfNotPresent
+  # Always pull in staging too (clears kube-score's image-pull-policy check).
+  pullPolicy: Always
 
 resources: {}
 resourcesPreset: "small"

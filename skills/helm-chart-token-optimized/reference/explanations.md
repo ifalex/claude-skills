@@ -97,20 +97,20 @@ Most web apps: ClusterIP + Ingress.
 **Explain:** The HorizontalPodAutoscaler watches CPU/memory and scales replicas between min and max to hit a target utilization (e.g. keep CPU ~80%). Requires the metrics-server in the cluster and **resource requests set** (this chart sets them). When enabled, the workload's `replicas` field is omitted so HPA fully owns the count.
 
 ### Q3.4 PDB (disruption budget)
-**Ask:** "Protect against voluntary disruptions (PDB)? [no]. If yes: minAvailable [1]."
-**Default:** disabled (prod overlay enables it).
+**Ask:** "Protect against voluntary disruptions (PDB)? [no]. If yes: minAvailable [blank]."
+**Default:** disabled (uat/prod overlays enable it). When enabled with a blank `minAvailable`, the PDB uses `maxUnavailable: 1` — safe at **any** replica count and never blocks all evictions (so it won't conflict with replicaCount). Set `minAvailable` explicitly (e.g. prod uses 2 with 3 replicas) only when you want a stricter floor.
 **One-liner:** A PodDisruptionBudget stops node drains/upgrades from taking down too many pods at once.
-**Explain:** During *voluntary* disruptions (node drain, cluster upgrade), a PodDisruptionBudget enforces e.g. "always keep ≥1 (or ≥50%) available". Prevents an admin draining a node from accidentally taking your whole app offline. Only meaningful with ≥2 replicas.
+**Explain:** During *voluntary* disruptions (node drain, cluster upgrade), a PodDisruptionBudget enforces e.g. "always keep ≥N available". ⚠️ `minAvailable` equal to (or above) the replica count blocks **all** voluntary evictions — that's why the default uses `maxUnavailable: 1` instead. Only meaningful with ≥2 replicas. The chart also sets `unhealthyPodEvictionPolicy: AlwaysAllow` (k8s ≥1.27) so unhealthy pods can still be evicted.
 
 ---
 
 ## Group 4 — Security & Config
 
 ### Q4.1 Run-as user
-**Ask:** "Run as which UID? [1001] (non-root)."
-**Default:** `1001`, `runAsNonRoot: true`.
+**Ask:** "Run as which UID? [10001] (non-root)."
+**Default:** `10001`, `runAsNonRoot: true` (applied to `runAsUser`, `runAsGroup`, and `fsGroup`).
 **One-liner:** The Linux user inside the container. Non-root is required by most security policies.
-**Explain:** Running as root in a container is a common finding for kube-score/kube-linter and PodSecurity standards. UID 1001 is Bitnami's convention. Your image must allow this user to read its files. If the app *must* bind a port <1024, prefer adding the `NET_BIND_SERVICE` capability over running as root — ask me.
+**Explain:** Running as root is a common finding for kube-score/kube-linter and PodSecurity standards. kube-score additionally wants UID/GID **≥ 10000**, so the chart defaults to `10001` (clears that check). Your image's files must be readable by this UID — if the image hardcodes a specific user (e.g. Bitnami's 1001), set that instead. Some platforms (OpenShift) assign an even higher arbitrary UID; override `RUN_AS_USER` to match. If the app *must* bind a port <1024, prefer adding the `NET_BIND_SERVICE` capability over running as root — ask me.
 
 ### Q4.2 Read-only root filesystem
 **Ask:** "Make the container filesystem read-only? [true] (recommended)."

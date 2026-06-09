@@ -39,3 +39,25 @@ echo ">>> scaffold run 2"; bash "$SCAFFOLD" --answers "$ANSWERS" --out "$OUTROOT
 
 echo "### Comparing run1 vs run2"
 "$HERE/compare-charts.sh" "$OUTROOT/run1/$CHART_NAME" "$OUTROOT/run2/$CHART_NAME" "$THRESHOLD"
+status=$?
+
+# --- Render every overlay (catches an overlay that breaks templating) ---------
+# helm-gated: skips cleanly on runners without helm so the core determinism
+# check stays dependency-free.
+CHART1="$OUTROOT/run1/$CHART_NAME"
+if command -v helm >/dev/null 2>&1; then
+  echo
+  echo "### helm template — base + each overlay (run1)"
+  for vals in values.yaml values-dev.yaml values-uat.yaml values-prod.yaml; do
+    echo "  - rendering with $vals"
+    if ! helm template "$CHART1" -f "$CHART1/$vals" >/dev/null; then
+      echo "FAIL ❌  helm template with $vals"; status=1
+    fi
+  done
+  [[ "$status" -eq 0 ]] && echo "  all overlays render."
+else
+  echo
+  echo "(helm not installed — overlay rendering skipped; determinism check still ran.)"
+fi
+
+exit "$status"

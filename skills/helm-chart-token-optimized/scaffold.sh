@@ -11,6 +11,11 @@
 # Usage:
 #   ./scaffold.sh --answers answers.env --out ./           # writes ./<chart-name>/
 #   ./scaffold.sh --answers answers.env --out /tmp/x --dry-run
+#   ./scaffold.sh --answers answers.env --plan             # print plan summary, write nothing
+#
+# --plan prints a compact, deterministic confirmation summary (chart, workload,
+# enabled features, security defaults) and exits WITHOUT writing files — use it
+# for the "confirm once" gate so the summary is script-owned, not model-authored.
 #
 # The answers file is KEY=VALUE shell assignments (see answers.example.env).
 # Required keys are validated; everything else has a safe production default.
@@ -24,6 +29,7 @@ TPL="$HERE/reference/templates"
 ANSWERS=""
 OUT="."
 DRYRUN=0
+PLAN=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -31,7 +37,8 @@ while [[ $# -gt 0 ]]; do
     --out)       OUT="$2"; shift 2;;
     --templates) TPL="$2"; shift 2;;
     --dry-run)   DRYRUN=1; shift;;
-    -h|--help)   sed -n '2,30p' "$0"; exit 0;;
+    --plan)      PLAN=1; shift;;
+    -h|--help)   sed -n '2,34p' "$0"; exit 0;;
     *) echo "scaffold: unknown arg: $1" >&2; exit 2;;
   esac
 done
@@ -45,12 +52,14 @@ CHART_NAME=""; DESCRIPTION=""; APP_VERSION=""
 IMAGE_REGISTRY="docker.io"; IMAGE_REPOSITORY=""; IMAGE_TAG=""
 CONTAINER_PORT="8080"; WORKLOAD="Deployment"
 SERVICE_TYPE="ClusterIP"; SERVICE_PORT="80"
-REPLICA_COUNT="1"; RUN_AS_USER="1001"; READ_ONLY_ROOT_FS="true"
+REPLICA_COUNT="1"; RUN_AS_USER="10001"; READ_ONLY_ROOT_FS="true"
 MAINTAINER="team"
 INGRESS_ENABLED="false"; INGRESS_HOSTNAME=""; INGRESS_CLASS=""; INGRESS_TLS="none"
 PERSISTENCE_ENABLED="false"; PERSISTENCE_SIZE="8Gi"; PERSISTENCE_MOUNT="/data"
 HPA_ENABLED="false"; HPA_MIN="2"; HPA_MAX="5"; HPA_TARGET_CPU="80"
-PDB_ENABLED="false"; PDB_MIN_AVAILABLE="1"
+# Empty PDB_MIN_AVAILABLE => the PDB renders maxUnavailable:1 (safe at ANY replica
+# count; never blocks all evictions). Overlays/answers can set minAvailable explicitly.
+PDB_ENABLED="false"; PDB_MIN_AVAILABLE=""
 NETWORKPOLICY_ENABLED="false"
 METRICS_ENABLED="false"; SERVICEMONITOR_ENABLED="false"; METRICS_PORT="9090"
 SA_CREATE="true"
@@ -84,6 +93,45 @@ case "$INGRESS_TLS" in
   none) ;;
   *) echo "ERROR: INGRESS_TLS must be none|cert-manager|self-signed" >&2; exit 1;;
 esac
+
+# --- Plan summary (script-owned confirmation; writes nothing) -----------------
+if [[ "$PLAN" -eq 1 ]]; then
+  feats=""
+  add_feat() { [[ "$2" == "true" ]] && feats="$feats${feats:+, }$1"; }
+  add_feat ingress "$INGRESS_ENABLED"
+  add_feat persistence "$PERSISTENCE_ENABLED"
+  add_feat hpa "$HPA_ENABLED"
+  add_feat pdb "$PDB_ENABLED"
+  add_feat networkpolicy "$NETWORKPOLICY_ENABLED"
+  add_feat metrics "$METRICS_ENABLED"
+  add_feat servicemonitor "$SERVICEMONITOR_ENABLED"
+  add_feat secrets "$SECRETS_ENABLED"
+  add_feat configmap "$CONFIGMAP_ENABLED"
+  [[ -z "$feats" ]] && feats="(none)"
+  if [[ "$INGRESS_ENABLED" == "true" ]]; then
+    ingress_line="$INGRESS_HOSTNAME (class=${INGRESS_CLASS:-default}, tls=$INGRESS_TLS)"
+  else
+    ingress_line="disabled"
+  fi
+  cat <<PLAN
+==> Helm chart plan (confirm before generating)
+    chart:        $CHART_NAME
+    description:  $DESCRIPTION
+    appVersion:   $APP_VERSION
+    image:        $IMAGE_REGISTRY/$IMAGE_REPOSITORY:$IMAGE_TAG  (pullPolicy IfNotPresent)
+    workload:     $WORKLOAD   replicas=$REPLICA_COUNT
+    service:      $SERVICE_TYPE  port $SERVICE_PORT -> containerPort $CONTAINER_PORT
+    ingress:      $ingress_line
+    features on:  $feats
+    security:     non-root UID $RUN_AS_USER, runAsNonRoot, readOnlyRootFilesystem=$READ_ONLY_ROOT_FS,
+                  drop ALL capabilities, seccompProfile=RuntimeDefault, resource requests+limits,
+                  liveness + readiness probes, automountServiceAccountToken=false
+    environments: values.yaml + values-dev.yaml + values-uat.yaml + values-prod.yaml
+    output dir:   $OUT/$CHART_NAME
+Run the same command without --plan to generate.
+PLAN
+  exit 0
+fi
 
 # --- sed-escape a replacement string (handle \\ & and the | delimiter) -------
 esc() { printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'; }
@@ -178,17 +226,22 @@ if [[ "$WORKLOAD" == "Deployment" && "$PERSISTENCE_ENABLED" == "true" ]]; then
   emit pvc.yaml templates/pvc.yaml
 fi
 
-# --- Conditional feature templates -------------------------------------------
-[[ "$INGRESS_ENABLED" == "true" ]]        && emit ingress.yaml        templates/ingress.yaml
-[[ "$PDB_ENABLED" == "true" ]]            && emit pdb.yaml            templates/pdb.yaml
-[[ "$NETWORKPOLICY_ENABLED" == "true" ]]  && emit networkpolicy.yaml  templates/networkpolicy.yaml
-[[ "$SERVICEMONITOR_ENABLED" == "true" ]] && emit servicemonitor.yaml templates/servicemonitor.yaml
+# --- Feature templates -------------------------------------------------------
+# Always emitted; each self-guards on its own value (renders nothing when off).
+# This is what lets the env overlays ENABLE hardening (PDB, NetworkPolicy, HPA,
+# ingress) in prod even when the feature was off at generation time — the toggle
+# only sets the default in values.yaml, not whether the template exists. Token
+# cost is zero: bodies are copied on disk and never read by the model.
+emit ingress.yaml        templates/ingress.yaml        # gated by ingress.enabled
+emit pdb.yaml            templates/pdb.yaml            # gated by pdb.create
+emit networkpolicy.yaml  templates/networkpolicy.yaml  # gated by networkPolicy.enabled
+emit servicemonitor.yaml templates/servicemonitor.yaml # gated by metrics.serviceMonitor.enabled
+# HPA hardcodes kind: Deployment, so emit it only for a Deployment (its value
+# gate, autoscaling.enabled, still controls whether it renders).
+[[ "$WORKLOAD" == "Deployment" ]] && emit hpa.yaml templates/hpa.yaml
+# Content-driven extras: only when chosen (no overlay enables these).
 [[ "$SECRETS_ENABLED" == "true" ]]        && emit secrets.yaml        templates/secrets.yaml
 [[ "$CONFIGMAP_ENABLED" == "true" ]]      && emit configmap.yaml      templates/configmap.yaml
-# HPA only makes sense for Deployment (StatefulSet/DaemonSet not autoscaled here).
-if [[ "$HPA_ENABLED" == "true" && "$WORKLOAD" == "Deployment" ]]; then
-  emit hpa.yaml templates/hpa.yaml
-fi
 
 echo "scaffold: done."
 [[ "$DRYRUN" -eq 0 ]] && echo "Next: review values.yaml, run helm lint '$CHART_DIR', then helm-docs for README.md."

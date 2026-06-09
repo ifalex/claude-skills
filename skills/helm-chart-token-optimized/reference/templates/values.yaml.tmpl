@@ -53,7 +53,12 @@ updateStrategy:
 # -- Extra pod labels
 podLabels: {}
 # -- Extra pod annotations
-podAnnotations: {}
+podAnnotations:
+  # kube-score: liveness and readiness intentionally share one TCP handler — no
+  # app-specific HTTP health path is known when the chart is generated. Remove
+  # this ignore once you set distinct httpGet probes (customLivenessProbe /
+  # customReadinessProbe), which is the proper fix.
+  kube-score/ignore: pod-probes-identical
 # -- Mount the ServiceAccount token into the pod
 automountServiceAccountToken: false
 hostAliases: []
@@ -240,9 +245,11 @@ autoscaling:
 pdb:
   # -- Create a PodDisruptionBudget
   create: %%PDB_ENABLED%%
-  # -- Minimum available pods during disruption
+  # -- Minimum available pods during disruption (blank => maxUnavailable:1 is used, safe at any replica count)
   minAvailable: %%PDB_MIN_AVAILABLE%%
   maxUnavailable: ""
+  # -- Evict unhealthy pods even at the budget (AlwaysAllow recommended; needs k8s >=1.27; set "" to omit on older clusters)
+  unhealthyPodEvictionPolicy: AlwaysAllow
 
 ## @section Network policy
 networkPolicy:

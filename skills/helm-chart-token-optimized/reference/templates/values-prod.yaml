@@ -4,7 +4,9 @@
 replicaCount: 3
 
 image:
-  pullPolicy: IfNotPresent
+  # Always pull in prod (clears kube-score's image-pull-policy check for tag-based
+  # images). Harmless when the image is pinned by digest.
+  pullPolicy: Always
 
 # Explicit requests AND limits in prod (do not rely on a preset).
 resources:

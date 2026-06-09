@@ -4,6 +4,15 @@ Verifies the skill produces the **same chart from the same answers**. Because v2
 generates via `scaffold.sh` (deterministic `cp`+`sed`), the primary test needs
 **no agent/LLM at all** and expects **100%** identical output.
 
+## Run everything (no model)
+
+```bash
+./run-all.sh
+```
+
+Runs the four no-model guards below in sequence and fails if any fails. The
+helm-gated ones SKIP cleanly when `helm` is absent, so it's safe in minimal CI.
+
 ## Primary: zero-token scaffold determinism (no model)
 
 ```bash
@@ -13,7 +22,28 @@ generates via `scaffold.sh` (deterministic `cp`+`sed`), the primary test needs
 
 Runs `scaffold.sh` twice and compares. This is the real determinism guarantee of
 v2 — a non-100% result is a genuine bug in `scaffold.sh` or a template. Fast,
-free, runs in CI.
+free, runs in CI. When `helm` is present it also `helm template`s the base chart
+and each `values-{dev,uat,prod}.yaml` overlay to catch an overlay that breaks
+rendering.
+
+## Guards (no model, fast, CI-friendly)
+
+| Script | Checks | Needs helm? |
+|--------|--------|-------------|
+| `check-placeholder-parity.sh` | every `%%X%%` in `values.yaml.tmpl` has a matching `add X` in `scaffold.sh` (and no dead `add` lines) — stops a literal `%%X%%` shipping in a user's values | no |
+| `check-defaults-parity.sh` | `answers.example.env` keys are identical to the variables `scaffold.sh` recognises — stops a renamed key silently losing effect | no |
+| `lint-all-features.sh` | scaffolds with **every** toggle on, then `helm lint` (values vs `values.schema.json`) + `helm template` each overlay — schema↔values coverage | yes (SKIPs without) |
+| `check-kube-quality.sh` | scaffolds a default chart, asserts **kube-linter clean** + **kube-score 0 CRITICAL** on the uat/prod overlays (dev is permissive by design) | yes (SKIPs without) |
+| `check-deployed-sync.sh` | diffs the **deployed** skill copy (`~/.claude/skills/…`, `~/.copilot/skills/…`) against this repo — warns when the live skill lags the source of truth | no |
+
+`check-deployed-sync.sh` is environment-specific (it inspects your local install
+paths) so it's **not** part of `run-all.sh`. Run it after editing the skill:
+
+```bash
+./check-deployed-sync.sh              # FAIL on drift (exit 1)
+./check-deployed-sync.sh --warn-only  # report drift but exit 0
+# in sync again after:  ../../deploy.sh helm-chart-token-optimized
+```
 
 ## Secondary: end-to-end agent determinism (optional, uses a model)
 
@@ -39,6 +69,14 @@ So the only platform-specific thing is *how you invoke your agent* — captured 
 a single `--driver` string.
 
 ## Files
+- `run-all.sh` — run all four no-model guards; non-zero if any fails.
+- `run-scaffold-determinism.sh` — scaffold twice, byte-compare (+ render overlays when helm present).
+- `check-placeholder-parity.sh` — `%%X%%` ↔ `add X` parity (no model).
+- `check-defaults-parity.sh` — `answers.example.env` keys ↔ `scaffold.sh` vars (no model).
+- `lint-all-features.sh` — all toggles on; `helm lint` vs schema + render overlays.
+- `check-kube-quality.sh` — kube-linter clean + kube-score 0 CRITICAL on uat/prod.
+- `check-deployed-sync.sh` — deployed skill copy vs repo (drift guard).
+- `answers.all-features.env` — fixture enabling every toggle (drives `lint-all-features.sh`).
 - `compare-charts.sh` — compare two chart dirs; exit 0 if overall ≥ threshold (95%).
 - `run-determinism.sh` — run the same prompt N times via your CLI, then compare.
 - `scenario-a.prompt.txt` — front-loaded prompt with ALL answers inline (a

@@ -1,6 +1,16 @@
 # Improve an Existing Chart
 
-How to raise an existing Helm chart to this skill's best practices **without changing its structure**. Use this with the "Mode: Improve Existing Chart" procedure in `SKILL.md`.
+How to raise an existing Helm chart to this skill's best practices **without changing its structure**. Read this whenever you enter **Improve mode** (the target already has a `Chart.yaml`); `SKILL.md` only points here.
+
+## Procedure
+
+1. **Inventory (read-only).** Read `Chart.yaml`, `values.yaml`, every file under `templates/`, any `values.schema.json`, and any env overlays. Map the chart's naming scheme, layout, and which best-practice features it already has. Do not write anything yet.
+2. **Audit** against the checklist below (security context, probes, resource requests/limits, values schema, multi-env overlays, helm-docs `# --` comments, PDB/HPA, NetworkPolicy, ServiceAccount token automount, image tag immutability, …). Classify each gap **Critical / High / Medium / Low**.
+3. **Preserve structure (non-negotiable).** Do NOT rename files, move or split templates, reorder `values.yaml` keys, or change the release/helper naming scheme. Improvements must be **additive or in-place field edits** that fit the existing layout (see *Golden rule* below). If a best practice would require restructuring, list it as a *proposal* — never impose it.
+4. **Proposal report.** Present gaps grouped by severity (format at the end of this file). For each: what's missing, why it matters, the exact proposed change, and whether it's **auto-applicable** (derivable from the chart) or **needs a user answer**.
+5. **Ask only the gap-filling questions.** For gaps not derivable from the existing chart, ask the relevant question-group questions (reuse `reference/explanations.md`) — only the ones the chart doesn't already answer. **Same blocking gate as Step 0:** do not edit files until the user approves the proposal and answers the open questions (or explicitly says "apply the auto-fixable ones, skip the rest").
+6. **Apply in place.** Edit the existing files to implement approved changes, matching the surrounding indentation and style. Copy any *new* template files verbatim from `reference/templates/` (CHARTNAME substituted), adapting names to the existing chart's convention.
+7. **Quality gates + summary** — run the same gates as Create mode and report a clear **before → after** of what changed.
 
 ## Golden rule: preserve structure
 
