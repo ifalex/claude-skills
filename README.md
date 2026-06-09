@@ -14,6 +14,27 @@ your agent's skills directory with [`deploy.sh`](#install).
 | [`helm-chart-creator`](skills/helm-chart-creator/) | Interviews you, then generates a production-grade, self-contained Helm chart (Bitnami conventions inlined — no OCI dependency) with security hardening, multi-environment values (dev/uat/prod), a `values.schema.json`, and validates the output with `kube-linter` + `kube-score`. Built for non-experts: every question has a default, an example, and explain-on-demand. The interview is a **blocking gate** — it never assumes defaults silently. Also runs an **improve mode** that audits and hardens an *existing* chart without changing its structure, presenting a proposal list first. Output is **deterministic** (templates copied verbatim) with a [test harness](skills/helm-chart-creator/tests/) to verify it. |
 | [`helm-chart-token-optimized`](skills/helm-chart-token-optimized/) | **Token-lean, deterministic sibling** of `helm-chart-creator` — same production-grade output, but generation runs through a bundled `scaffold.sh` so template bodies never pass through the model's context (~40K tokens/chart saved). Short **tiered interview** (essentials first, full list on demand), confirmed once; same blocking gate and improve mode. Output is **byte-identical** for identical answers (`cp`+`sed`, not model text). **Every environment (dev/uat/prod) passes `kube-score` with 0 CRITICAL and `kube-linter` clean out of the box** — identical security posture across envs (non-root UID ≥10000, NetworkPolicy on, always-pull, ephemeral-storage, replica-safe PDB); only scale/resources differ. Ships a **no-model [test suite](skills/helm-chart-token-optimized/tests/)** (`run-all.sh`): determinism, placeholder/defaults parity, schema lint, and a kube-linter/kube-score quality gate. |
 
+## Skill-creator evaluation — `helm-chart-token-optimized`
+
+Scored against the [`superpowers:writing-skills`](https://agentskills.io) (skill-creator) rubric.
+
+**Rating: 8 / 10**
+
+| Dimension (skill-creator) | Score | Notes |
+|---|---|---|
+| **CSO / description** | 9 | Triggers-only, "Use when…", no workflow summary. Verified it no longer lets models shortcut the Step 0 gate. Keywords + `helm-chart-creator` disambiguation present. |
+| **Naming / discovery** | 9 | `helm-chart-token-optimized` is descriptive and intent-revealing. |
+| **Structure** | 9 | Overview w/ core principle, When/When-NOT, quick-ref tables, Common Mistakes, Reference Files index — all present and well-formed. |
+| **Bulletproofing** | 10 | Red Flags STOP table, rationalization→reality columns, explicit loophole closure ("Generate now ≠ ask nothing", "low effort budget never removes the gate"). |
+| **Testing (Iron Law)** | 8 | Behavioral RED/GREEN gate test baselined on the right tier (Sonnet) and verified live. Docked because it was retrofitted after the skill, not test-first; weak-model smoke check documented but not yet run. |
+| **Reference / file org** | 10 | Lazy-loading table is exemplary — none of the reference files load on the common path. Heavy templates/explanations correctly behind branches. |
+| **Token efficiency** | 5 | The drag. `SKILL.md` is ~2,690 words (~5× the <500 target) and loads every invocation. Some is justified (the gate must be inline), but the "always interview" point is restated ~5× and the generation/quality sections duplicate `scaffold.sh --help`. |
+| **Anti-patterns** | 9 | No narrative storytelling, no multi-language dilution, no code-in-flowcharts. One excellent path (scaffold) over many mediocre ones. |
+
+**Path to 9:** a body-trim pass (de-duplicate the "always interview" restatements
+and the scaffold-internals prose down to ~1,200–1,400 words) lifts token efficiency
+without touching the gate language that makes the skill bulletproof.
+
 ## Install
 
 Clone the repo, then deploy with the script. By default it publishes **all** skills
