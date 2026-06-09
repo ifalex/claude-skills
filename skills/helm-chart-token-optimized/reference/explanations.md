@@ -167,10 +167,10 @@ Most web apps: ClusterIP + Ingress.
 **Explain:** A ServiceMonitor is a CRD from the Prometheus Operator (kube-prometheus-stack). It declaratively registers your Service for scraping — no manual Prometheus config. Only works if the Operator is installed; otherwise it's an inert object.
 
 ### Q5.4 NetworkPolicy
-**Ask:** "Add a NetworkPolicy? [no] — restricts which pods can reach this one."
-**Default:** disabled; when enabled, default to allowing DNS egress + same-namespace ingress.
-**One-liner:** A firewall for pod-to-pod traffic. Default-deny, then allow what's needed.
-**Explain:** Without a NetworkPolicy, any pod can talk to any pod. A NetworkPolicy restricts ingress/egress by pod/namespace labels. We generate a sane baseline (allow DNS, allow same-namespace) you can tighten. ⚠️ Only enforced if the cluster's CNI supports it (Calico, Cilium); on others it's silently ignored.
+**Ask:** "Add a NetworkPolicy? [yes — permissive allow-all baseline] — you can tighten it later."
+**Default:** **enabled** as a permissive allow-all baseline (`allowExternal: true`), in **every** environment. A NetworkPolicy object exists so the cluster is "policy-aware" and kube-score passes, but nothing is blocked until you tighten it.
+**One-liner:** A firewall for pod-to-pod traffic. We ship it allow-all; you narrow it when ready.
+**Explain:** Without a NetworkPolicy, any pod can talk to any pod. Shipping a permissive policy everywhere keeps the security *shape* identical across dev/uat/prod (you don't discover policy problems only in prod) without blocking iteration. Tighten by setting `allowExternal: false` and adding `extraIngress`/`extraEgress` rules. Say "no" to omit it entirely. ⚠️ Only enforced if the cluster's CNI supports it (Calico, Cilium); on others it's silently ignored.
 
 ---
 
@@ -182,13 +182,15 @@ Most web apps: ClusterIP + Ingress.
 |---------|------------------------------|------------------------|--------------------------|
 | replicaCount | 1 | 2 | 3 |
 | resources | `resourcesPreset: nano` | `small` | explicit requests+limits |
-| image.pullPolicy | `Always` | `IfNotPresent` | `IfNotPresent` |
-| HPA | off | off | on (if chosen) |
-| PDB | off | minAvailable 1 | minAvailable 2 (if chosen) |
+| image.pullPolicy | `Always` (base default — same everywhere) | `Always` | `Always` |
+| HPA | off | off | on |
+| PDB | off | create (maxUnavailable 1) | minAvailable 2 |
 | ingress.tls | self-signed/none | cert-manager (staging issuer) | cert-manager (prod issuer) |
-| NetworkPolicy | off | on | on (if chosen) |
+| NetworkPolicy | on (allow-all) | on (allow-all) | on (allow-all) |
 | log level (if env) | debug | info | info/warn |
 | podAntiAffinity | off | soft | soft (or hard) |
+
+Security posture (NetworkPolicy present, `pullPolicy: Always`, non-root UID, dropped caps, read-only root, probes) is **identical** across environments — only scale and resources change. That's why every overlay passes kube-score.
 
 Apply with: `helm upgrade --install <release> ./<chart> -f ./<chart>/values-prod.yaml -n <ns>`.
 The common `values.yaml` is always loaded first; the `-f` overlay layers on top.

@@ -3,9 +3,7 @@
 
 replicaCount: 2
 
-image:
-  # Always pull in staging too (clears kube-score's image-pull-policy check).
-  pullPolicy: Always
+# pullPolicy: Always and a permissive NetworkPolicy come from the base values.
 
 resources: {}
 resourcesPreset: "small"

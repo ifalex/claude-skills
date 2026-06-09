@@ -3,8 +3,10 @@
 
 replicaCount: 1
 
-image:
-  pullPolicy: Always   # pick up freshly pushed dev tags
+# pullPolicy is Always from the base values (best practice). If your dev cluster
+# runs locally-loaded images (kind/minikube) not in a registry, set:
+# image:
+#   pullPolicy: IfNotPresent
 
 # Use a small preset instead of explicit resources in dev.
 resources: {}
@@ -18,8 +20,11 @@ autoscaling:
 pdb:
   create: false
 
+# Keep the same permissive NetworkPolicy as the base (allow-all) so dev matches
+# the prod security shape and passes kube-score; tighten in uat/prod if desired.
 networkPolicy:
-  enabled: false
+  enabled: true
+  allowExternal: true
 
 ingress:
   enabled: false

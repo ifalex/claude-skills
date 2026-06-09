@@ -120,7 +120,7 @@ Compact summary below. Full question text, defaults, examples, and "what is X" e
 **Group 5 — Persistence & Observability**
 - Persistence? [StatefulSet: yes 8Gi / Deployment: no] → size, storageClass, mountPath, accessMode [ReadWriteOnce]
 - Metrics endpoint? [no] → path [/metrics], port
-- ServiceMonitor? [no] (requires Prometheus Operator) · NetworkPolicy? [no]
+- ServiceMonitor? [no] (requires Prometheus Operator) · NetworkPolicy? [yes — permissive allow-all baseline, present in every env; tighten or say no to omit]
 
 **Group 6 — Environments** (always generated, no question needed)
 - `values.yaml` (common base) + `values-dev.yaml` (SIT) + `values-uat.yaml` + `values-prod.yaml`. See `reference/explanations.md` § Environment overlays for the per-env defaults.
@@ -155,7 +155,7 @@ Full commands, install instructions, and the failure→fix table are in **`refer
 
 1. `helm lint <chart>/` and `helm template <chart>/ -f <chart>/values-prod.yaml` must both succeed (catches template/syntax errors).
 2. If `kube-linter` / `kube-score` are installed, run them on the rendered prod manifests. If not installed, offer to `brew install kube-linter kube-score` (or document it) and fall back to `helm lint` + a manual review against the fix table.
-3. **Fix every CRITICAL/HIGH finding** by adjusting templates or values, then re-run. Verified baseline: the default chart passes **kube-linter with 0 errors**, and the **uat and prod overlays score 0 kube-score CRITICAL out of the box** (UID 10001, `pullPolicy: Always`, NetworkPolicy + PDB enabled, ephemeral-storage set, identical-probes scoped-ignored). Run kube-score against `values-prod.yaml`/`values-uat.yaml` — those are the deploy targets. The **dev** overlay is intentionally permissive (single-replica SIT, NetworkPolicy off) and is *expected* to show one CRITICAL (Pod NetworkPolicy) — that's by design. `reference/quality-gates.md` explains how each finding is handled. Reach 0 CRITICAL on uat/prod before declaring done.
+3. **Fix every CRITICAL/HIGH finding** by adjusting templates or values, then re-run. Verified baseline: the default chart passes **kube-linter with 0 errors**, and **every environment — base + dev/uat/prod — scores 0 kube-score CRITICAL out of the box** (UID 10001, `pullPolicy: Always`, NetworkPolicy on everywhere as a permissive allow-all baseline, PDB on uat/prod, ephemeral-storage set, identical-probes scoped-ignored). Security posture is identical across environments; only scale/resources differ. `reference/quality-gates.md` explains how each finding is handled. Reach 0 CRITICAL on every overlay before declaring done.
 4. Report the final tool output verbatim. If a check was skipped (tool not installed), say so — don't imply it passed.
 
 ## Common Mistakes

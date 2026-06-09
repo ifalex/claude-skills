@@ -3,10 +3,8 @@
 
 replicaCount: 3
 
-image:
-  # Always pull in prod (clears kube-score's image-pull-policy check for tag-based
-  # images). Harmless when the image is pinned by digest.
-  pullPolicy: Always
+# pullPolicy: Always comes from the base values. Pin image.digest for the
+# strongest reproducibility (digest also satisfies the pull-policy check).
 
 # Explicit requests AND limits in prod (do not rely on a preset).
 resources:

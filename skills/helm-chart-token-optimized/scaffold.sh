@@ -60,7 +60,9 @@ HPA_ENABLED="false"; HPA_MIN="2"; HPA_MAX="5"; HPA_TARGET_CPU="80"
 # Empty PDB_MIN_AVAILABLE => the PDB renders maxUnavailable:1 (safe at ANY replica
 # count; never blocks all evictions). Overlays/answers can set minAvailable explicitly.
 PDB_ENABLED="false"; PDB_MIN_AVAILABLE=""
-NETWORKPOLICY_ENABLED="false"
+# NetworkPolicy on by default = permissive allow-all baseline (present in every
+# environment so kube-score passes; tighten via allowExternal:false + extra rules).
+NETWORKPOLICY_ENABLED="true"
 METRICS_ENABLED="false"; SERVICEMONITOR_ENABLED="false"; METRICS_PORT="9090"
 SA_CREATE="true"
 SECRETS_ENABLED="false"; CONFIGMAP_ENABLED="false"

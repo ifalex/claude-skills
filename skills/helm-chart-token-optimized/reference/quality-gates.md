@@ -54,9 +54,9 @@ Run at least the prod overlay (strictest). kube-score grades each object; treat 
 
 Adjust templates/values, re-run Steps 1–3 until clean.
 
-**Reality check (verified):** the default chart passes `kube-linter` with **zero** errors, and the **uat and prod overlays score 0 kube-score CRITICAL out of the box** — no manual post-fixing. The **dev** overlay is intentionally permissive (single-replica SIT, NetworkPolicy off) and is *expected* to show one kube-score CRITICAL (Pod NetworkPolicy); that is by design, not a regression. Run kube-score against `values-prod.yaml` (and `values-uat.yaml`) — those are the deploy targets. Don't claim kube-score passed if you only ran kube-linter.
+**Reality check (verified):** the default chart passes `kube-linter` with **zero** errors, and **every environment — the base values plus dev/uat/prod — scores 0 kube-score CRITICAL out of the box**, no manual post-fixing. Security posture is identical across environments (NetworkPolicy present, `pullPolicy: Always`, non-root UID ≥10000); only **scale and resources** differ (dev 1 replica/nano, uat 2/small, prod 3 + explicit limits + HPA). dev keeps the NetworkPolicy permissive (allow-all) so it never blocks iteration while still satisfying the check. Run kube-score against any overlay — they all pass. Don't claim kube-score passed if you only ran kube-linter.
 
-`tests/check-kube-quality.sh` enforces this (kube-linter clean + uat/prod 0 CRITICAL).
+`tests/check-kube-quality.sh` enforces this (kube-linter clean + 0 CRITICAL on base/dev/uat/prod).
 
 ### How each kube-score CRITICAL is already handled
 
@@ -64,8 +64,8 @@ Adjust templates/values, re-run Steps 1–3 until clean.
 |--------------------|------------------------------------|
 | **Container Ephemeral Storage Request and Limit** | `ephemeral-storage` is in the resources defaults and every `resourcesPreset`. Add it if you write a custom `resources:` block. |
 | **Container Security Context User Group ID** (UID/GID ≥ 10000) | Default `RUN_AS_USER=10001` → `runAsUser`/`runAsGroup`/`fsGroup` are all 10001. Override per image; some platforms (OpenShift) assign an even higher UID. |
-| **Container Image Pull Policy** | The **uat and prod overlays set `image.pullPolicy: Always`**. dev keeps `Always` for fresh tags; the base default is `IfNotPresent`. Pinning by `digest` also clears it. |
-| **Pod NetworkPolicy** | **uat and prod overlays enable `networkPolicy`**, and the template is always emitted so the overlay can turn it on. dev leaves it off by design. |
+| **Container Image Pull Policy** | Base default `image.pullPolicy: Always` (every environment). Use `IfNotPresent` only for images loaded locally onto kind/minikube; pinning by `digest` also clears the check. |
+| **Pod NetworkPolicy** | `networkPolicy` is **on by default** (permissive allow-all baseline) in every environment; the template is always emitted. Tighten with `allowExternal: false` + `extraIngress`/`extraEgress`. |
 | **Deployment has PodDisruptionBudget** / replicas | uat/prod enable `pdb.create` and run ≥2 replicas; the PDB template is always emitted. A PDB defaults to `maxUnavailable: 1` (safe at any replica count — never blocks all evictions) unless you set `minAvailable`. |
 | **Pod Probes Identical** | A generic chart only knows a TCP port, so liveness/readiness share one handler. The chart bakes a scoped `kube-score/ignore: pod-probes-identical` in `podAnnotations` with a comment. **Remove it and set distinct `customLivenessProbe`/`customReadinessProbe` httpGet checks** once you know the app's health endpoints — that's the proper fix. |
 

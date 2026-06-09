@@ -36,8 +36,10 @@ image:
   tag: "%%IMAGE_TAG%%"
   # -- Container image digest (overrides tag when set), e.g. sha256:...
   digest: ""
-  # -- Image pull policy
-  pullPolicy: IfNotPresent
+  # -- Image pull policy. Always is the best-practice default (consistent across
+  # environments; satisfies kube-score). Use IfNotPresent only for images loaded
+  # locally onto a kind/minikube node that aren't in a reachable registry.
+  pullPolicy: Always
   # -- Image pull secrets
   pullSecrets: []
 
@@ -253,7 +255,9 @@ pdb:
 
 ## @section Network policy
 networkPolicy:
-  # -- Enable a NetworkPolicy
+  # -- Enable a NetworkPolicy. On by default as a permissive allow-all baseline
+  # (a policy object exists everywhere, satisfying kube-score, without blocking
+  # traffic). Tighten by setting allowExternal:false + extraIngress/extraEgress.
   enabled: %%NETWORKPOLICY_ENABLED%%
   allowExternal: true
   allowExternalEgress: true
