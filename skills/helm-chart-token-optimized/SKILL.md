@@ -1,6 +1,6 @@
 ---
 name: helm-chart-token-optimized
-description: Token-lean, deterministic variant of helm-chart-creator. Use when creating a Helm chart, scaffolding a chart, or converting an app/Deployment/Docker image to Helm and you want minimal token usage with byte-identical, repeatable output. Runs a short tiered interview, then generates a production-grade chart (security hardening, multi-env values dev/uat/prod, values schema, kube-linter/kube-score) via a bundled scaffold.sh so templates never enter context. Also audits/hardens an existing chart.
+description: Use when creating, scaffolding, or converting an app/Deployment/Docker image into a Helm chart, or when auditing/hardening an existing chart, and you want minimal token usage with deterministic, byte-identical, repeatable output. Prefer this over helm-chart-creator when token budget matters or output must be reproducible. Covers production-grade charts with security hardening, multi-env values (dev/uat/prod), values schema, and kube-linter/kube-score gates.
 ---
 
 # Helm Chart Creator — token-optimized

@@ -79,6 +79,11 @@ a single `--driver` string.
 - `answers.all-features.env` — fixture enabling every toggle (drives `lint-all-features.sh`).
 - `compare-charts.sh` — compare two chart dirs; exit 0 if overall ≥ threshold (95%).
 - `run-determinism.sh` — run the same prompt N times via your CLI, then compare.
+- `check-interview-gate.sh` — behavioral test: a no-answers prompt must make the
+  skill ask first and write nothing (Step 0 gate). Uses a model.
+- `gate-bare.prompt.txt` — a "looks complete" prompt with no answers (drives the
+  gate test).
+- `scenario-gate.md` — RED/GREEN baseline expectations for the interview gate.
 - `scenario-a.prompt.txt` — front-loaded prompt with ALL answers inline (a
   non-interactive run never stalls waiting for the interview).
 - `scenario-a.md` — the same scenario as human-readable interactive answers.
@@ -134,5 +139,32 @@ For cross-platform: generate each chart on its own harness, then call
 
 > The front-loaded prompt intentionally bypasses the interview to test *output*
 > determinism. The interview-enforcement (Step 0 gate) is a separate behavioral
-> check — verify it by running the skill with a bare "create a chart" and
-> confirming it asks before writing anything.
+> check — automated by `check-interview-gate.sh` (below).
+
+## Behavioral: Step 0 interview gate (uses a model)
+
+`run-determinism.sh` front-loads every answer to measure *output*. This is its
+complement: it sends a prompt with **no answers** and asserts the skill **holds
+the gate** — asks first, writes nothing.
+
+```bash
+# Baseline on the realistic target tier (Sonnet), NOT a weak model:
+./check-interview-gate.sh --driver 'claude -p --model sonnet --permission-mode acceptEdits'
+```
+
+It runs the agent once in a fresh empty dir on `gate-bare.prompt.txt` (a request
+that *looks* complete — `nginx:1.25` on port 80 — the exact "the prompt already
+gave me enough" rationalization Step 0 targets) and PASSES only when **both**
+hold: zero chart files written **and** the agent emitted interview questions. A
+written `Chart.yaml`/`values.yaml` = gate breached = FAIL.
+
+**Why Sonnet, not Haiku:** a weak model failing the gate is a capability signal,
+not a skill defect; tuning the skill to force a weak model into compliance bloats
+the always-loaded body and fights the token-optimized goal. Baseline compliance
+on the tier users actually run; treat weaker models as a separate smoke check.
+
+**RED baseline (skill-creator methodology):** to confirm the gate does real work,
+run the same prompt through an agent that does **not** have the skill loaded (drop
+the `Use the helm-chart-token-optimized skill.` line). Expected RED: it scaffolds
+a chart from assumed defaults, writing files immediately. GREEN (skill present):
+it asks first. See `scenario-gate.md`.

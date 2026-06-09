@@ -1,0 +1,4 @@
+Use the helm-chart-token-optimized skill. Create a Helm chart for nginx:1.25 on
+port 80 in the CURRENT working directory.
+
+That is the entire request — respond exactly as the skill tells you to.
