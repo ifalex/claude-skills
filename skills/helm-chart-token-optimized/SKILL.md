@@ -127,7 +127,7 @@ Compact summary below. Full question text, defaults, examples, and "what is X" e
 
 ## Mode: Improve Existing Chart
 
-Triggered when the target already contains a `Chart.yaml`. Goal: **raise an existing chart to these best practices without changing its structure** — do NOT scaffold a fresh chart over an existing one. The full procedure (read-only inventory → audit → preserve-structure rules → proposal report → gap-filling questions → in-place apply → quality gates), the audit checklist, the gap→question mapping, and the proposal-report format all live in **`reference/improve-existing.md`** — **read it before touching anything in this mode**. The same blocking interview gate as Step 0 applies: no file edits until the user approves the proposal and answers the open questions.
+Triggered when the target already contains a `Chart.yaml`. **Improve mode is diagnosis-driven, not interview-driven** — the Step-0 essentials interview does NOT apply here, and you do NOT emit a list of gap-filling questions. Instead: inventory the chart, **diagnose with `kube-score`/`kube-linter`** (static audit fallback if absent), turn the findings into **one consolidated proposal** with safe defaults already chosen, and apply on a **single decision**. The proposal offers two strategies the user picks between — **A) harden in place** (preserve structure, default) or **B) refactor / re-scaffold** from the standard templates. Derivable fixes are pre-decided; app-specific unknowns get a safe default + a one-line "override if…" note, never a blocking question. **Non-interactive harnesses (Copilot CLI, IntelliJ) must not stall** — apply Strategy A with safe defaults and report the before→after rather than waiting on an answer. The full procedure, derivable-defaults table, Strategy-B steps, audit checklist, and proposal format live in **`reference/improve-existing.md`** — **read it before touching anything in this mode**.
 
 ## Generation Procedure (script-based — this is the token-saving core)
 
@@ -165,7 +165,9 @@ Full commands, install instructions, and the failure→fix table are in **`refer
 | **Generating a chart without asking anything** | **CRITICAL — always run the Step 0 interview. Defaults are opt-in, never silent.** |
 | **Reading template bodies into context / hand-writing templates** | Run `scaffold.sh` — it copies templates on disk so they never burn tokens. Manual copy is the no-shell fallback only. |
 | Confirming group-by-group | Ask essentials first (full list on demand), then confirm **once** before generating |
-| Restructuring an existing chart in Improve mode | Preserve layout/naming; additive or in-place edits only |
+| **Asking gap-filling questions in Improve mode** | **Improve is diagnosis-driven. Run linters, bake safe defaults into ONE proposal, decide on a single approval — don't spray NEEDS-ANSWER questions or inherit the Step-0 interview.** |
+| **Stalling in a non-interactive harness (Copilot/IntelliJ)** | Don't block on an unanswered question. Apply Strategy A safe defaults and report before→after. |
+| Restructuring an existing chart without being asked | Strategy A preserves layout/naming (additive/in-place). Restructure only under **Strategy B**, and only when the user picks it. |
 | Silently picking security values | Always state hardening defaults applied |
 | `readOnlyRootFilesystem: true` with no writable mount | Add an `emptyDir` for `/tmp` and any app write paths, or warn + set false |
 | Emitting `hpa.yaml` AND hardcoded `replicas` | scaffold handles this; if hand-editing, omit `replicas` when HPA is enabled (HPA owns it) |

@@ -1,106 +1,148 @@
 # Improve an Existing Chart
 
-How to raise an existing Helm chart to this skill's best practices **without changing its structure**. Read this whenever you enter **Improve mode** (the target already has a `Chart.yaml`); `SKILL.md` only points here.
+Raise an existing Helm chart to this skill's best practices. Read this whenever you
+enter **Improve mode** (the target already has a `Chart.yaml`); `SKILL.md` only points here.
+
+**Core change from Create mode: Improve is diagnosis-driven, not interview-driven.**
+You run linters (or a static audit), turn the findings into a **single consolidated
+proposal** with safe defaults already chosen, and apply on **one** decision. You do
+**not** run the Step-0 essentials interview and you do **not** emit a list of
+gap-filling questions. Derivable fixes are pre-decided; genuinely app-specific unknowns
+get a **safe default plus a one-line "override if…"** note — never a blocking question.
+
+## Two strategies — present both, user picks one
+
+| | **A — Harden in place** (default) | **B — Refactor / re-scaffold** |
+|---|---|---|
+| What | Additive / in-place field edits that fit the existing layout | Regenerate a standardized chart from `reference/templates/` via `scaffold.sh`, carrying the existing settings over |
+| Structure | **Preserved** (golden rule below) | Replaced with this skill's canonical structure |
+| Determinism | Byte-stable, structure-preserving | Generation is deterministic given a fixed `answers.env`; the *extraction* step is model-driven (judgement) |
+| Risk | Low | Custom values not mappable to an answer key (app env vars, annotations, sidecars, extra manifests) can be **dropped** unless re-applied — review the before→after |
+| Use when | The chart is broadly sound and just needs hardening | The chart is messy/inconsistent and the user explicitly wants it standardized/rebuilt |
+
+Default recommendation is **A**. Offer **B** in the same proposal; do B only if the
+user picks it. For B, see *Strategy B procedure* below.
 
 ## Procedure
 
-1. **Inventory (read-only).** Read `Chart.yaml`, `values.yaml`, every file under `templates/`, any `values.schema.json`, and any env overlays. Map the chart's naming scheme, layout, and which best-practice features it already has. Do not write anything yet.
-2. **Audit** against the checklist below (security context, probes, resource requests/limits, values schema, multi-env overlays, helm-docs `# --` comments, PDB/HPA, NetworkPolicy, ServiceAccount token automount, image tag immutability, …). Classify each gap **Critical / High / Medium / Low**.
-3. **Preserve structure (non-negotiable).** Do NOT rename files, move or split templates, reorder `values.yaml` keys, or change the release/helper naming scheme. Improvements must be **additive or in-place field edits** that fit the existing layout (see *Golden rule* below). If a best practice would require restructuring, list it as a *proposal* — never impose it.
-4. **Proposal report.** Present gaps grouped by severity (format at the end of this file). For each: what's missing, why it matters, the exact proposed change, and whether it's **auto-applicable** (derivable from the chart) or **needs a user answer**.
-5. **Ask only the gap-filling questions.** For gaps not derivable from the existing chart, ask the relevant question-group questions (reuse `reference/explanations.md`) — only the ones the chart doesn't already answer. **Same blocking gate as Step 0:** do not edit files until the user approves the proposal and answers the open questions (or explicitly says "apply the auto-fixable ones, skip the rest").
-6. **Apply in place.** Edit the existing files to implement approved changes, matching the surrounding indentation and style. Copy any *new* template files verbatim from `reference/templates/` (CHARTNAME substituted), adapting names to the existing chart's convention.
-7. **Quality gates + summary** — run the same gates as Create mode and report a clear **before → after** of what changed.
+1. **Inventory (read-only).** Read `Chart.yaml`, `values.yaml`, every file under
+   `templates/`, any `values.schema.json`, and any env overlays. Map naming, layout,
+   and which best-practice features already exist. Note custom values (app env vars,
+   annotations, sidecars, extra objects) — these matter for Strategy B. Write nothing yet.
+2. **Diagnose — linter-first (no questions).**
+   - Run `helm template <chart>/ > /tmp/rendered.yaml`, then `kube-score score` and
+     `kube-linter lint` on the rendered manifests. Parse findings into the gap list.
+   - If a linter isn't installed: offer `brew install kube-score kube-linter` but **do
+     not block** — fall back to the static *Audit checklist* below.
+3. **Decide each gap with a safe default (no gap-filling questions).** Use the
+   *Derivable defaults* table. Everything derivable is pre-decided. App-specific unknowns
+   get a working safe default and a one-line "override if…" — they are **not** questions.
+4. **Single proposal (the one decision).** Present the *Proposal format* below: findings
+   grouped by severity with the fix already chosen, the **A vs B** choice, and the
+   custom-value note. Then:
+   - **Interactive:** wait for **one** reply — `approve A` / `approve B` / "adjust these
+     items". Do not ask anything else first.
+   - **Non-interactive harness** (Copilot CLI, IntelliJ, or the user says they can't
+     answer back-and-forth): **do not stall.** Apply **Strategy A with the safe
+     defaults**, then report the before→after for review. List any item where a default
+     was assumed and how to override it. Never block on an unanswered question.
+5. **Apply.** Strategy A: edit existing files in place, matching surrounding indentation
+   and style; copy any *new* template files verbatim from `reference/templates/`
+   (CHARTNAME substituted), adapting names to the existing convention. Strategy B: follow
+   *Strategy B procedure*.
+6. **Quality gates + summary.** Run the same gates as Create mode (`helm lint`,
+   `helm template`, kube-linter/kube-score) and report a clear **before → after**.
 
-## Golden rule: preserve structure
+## Golden rule (Strategy A): preserve structure
 
-You are improving, not rewriting. **Do NOT:**
+You are improving, not rewriting. **Do NOT:** rename the chart/files/templates; move,
+split, or merge templates; reorder or rename `values.yaml` keys; change the
+release/object naming scheme or helper-template names; swap the chart's helper style.
+**Do:** add missing fields in place, add missing files that fit the existing convention,
+set safer values, add `# --` doc comments. If a real improvement *requires*
+restructuring, that's exactly what **Strategy B** is for — offer it, don't force it.
 
-- Rename the chart, files, or templates.
-- Move, split, or merge template files (e.g. don't break `deployment.yaml` into partials).
-- Reorder or rename keys in `values.yaml`, or change the existing nesting.
-- Change the release/object naming scheme or the helper-template names already in use.
-- Swap the chart's helper style (e.g. force Bitnami `common.*` onto a chart that uses its own `_helpers.tpl`).
+## Derivable defaults (replaces the old "gap → question mapping")
 
-**Do:** add missing fields in place, add missing files that fit the existing convention, set safer values, and add `# --` doc comments. If a real improvement *requires* restructuring, record it as a **proposal** and let the user decide — never impose it.
+None of these are questions. Apply the default; note it in the proposal as overridable.
 
-## Audit checklist
+| Gap | Default to apply | Override note (one line, not a blocking question) |
+|-----|------------------|---------------------------------------------------|
+| runAsNonRoot / runAsUser | `runAsNonRoot: true`, `runAsUser: 10001`, `runAsGroup`/`fsGroup: 10001` | confirm UID if the image needs a specific one |
+| Dropped capabilities | `capabilities.drop: [ALL]` | — |
+| allowPrivilegeEscalation | `false` | — |
+| seccompProfile | `RuntimeDefault` | — |
+| Resource requests + limits | overlay `resourcesPreset` (nano dev / small uat / explicit prod) | override sizing if the app has explicit needs |
+| Probes | TCP-socket liveness+readiness on the container port | override with an HTTP path if the app exposes one (e.g. `/healthz`) |
+| readOnlyRootFilesystem | `true` + `emptyDir` for `/tmp` | if the app writes elsewhere, add those mounts (or set `false`) |
+| imagePullPolicy | `IfNotPresent` (base) | — |
+| ServiceAccount | dedicated SA, `automountServiceAccountToken: false` | leave token on only if the app calls the K8s API |
+| PodDisruptionBudget | on for uat/prod overlays, `minAvailable: 1` | — |
+| NetworkPolicy | permissive allow-all baseline, present in every env | tighten or set off if not wanted |
+| values.schema.json | generate from current values | — |
+| Multi-env overlays | add `values-dev/uat/prod.yaml` (diffs only) | — |
+| helm-docs `# --` comments | add to leaf keys | — |
+| Pod anti-affinity | soft default for >1 replica | — |
+| `.helmignore` / `NOTES.txt` | add both | — |
+| Image tag `latest` | **recommend** pinning; keep current tag, flag loudly | provide a tag/digest to pin to |
 
-For each item, determine the chart's current state from the inventory, then classify the gap. "Derivable" means you can fix it without asking; "needs answer" means ask the mapped question.
+Image `latest` is the one item you cannot safely auto-resolve (only the user knows the
+intended version), so flag it as a recommendation — still **not** a blocking question.
 
-| # | Best practice | How to detect | Severity if missing | Derivable / needs answer |
-|---|---------------|---------------|---------------------|--------------------------|
-| 1 | **Non-root + `runAsNonRoot`** | `securityContext.runAsNonRoot: true`, `runAsUser` set (≥10000 preferred) | Critical | Derivable (default UID); confirm UID via Q4.1 if app-specific |
-| 2 | **Dropped capabilities** | `containerSecurityContext.capabilities.drop: [ALL]` | Critical | Derivable |
-| 3 | **`readOnlyRootFilesystem`** | set `true` + writable `emptyDir` for `/tmp` etc. | High | Needs answer (Q4.2 — which paths the app writes) |
-| 4 | **`allowPrivilegeEscalation: false`** | container securityContext | High | Derivable |
-| 5 | **Resource requests + limits** | `resources.requests/limits` (cpu, memory) | High | Derivable via overlay presets (`resourcesPreset` nano/small/explicit — see `explanations.md` § Environment overlays); confirm sizing only if the app has explicit needs |
-| 6 | **Liveness / readiness probes** | `livenessProbe`, `readinessProbe` on the container | High | Port derivable from `containerPort` (Q1.5); health **path** has no preset question — ask directly |
-| 7 | **Values schema** | `values.schema.json` present + covers top-level keys | Medium | Derivable from existing values |
-| 8 | **Multi-env overlays** | `values-dev/uat/prod.yaml` present | Medium | Derivable (generate overlays with diffs only) |
-| 9 | **helm-docs `# --` comments** | leaf keys in `values.yaml` documented | Low | Derivable |
-| 10 | **ServiceAccount + token automount** | dedicated SA, `automountServiceAccountToken: false` | Medium | Needs answer if app calls K8s API (Q4.3) |
-| 11 | **PodDisruptionBudget** | `pdb.yaml` / `PodDisruptionBudget` | Medium | Needs answer (Q3.4) |
-| 12 | **HPA** | `hpa.yaml` / `HorizontalPodAutoscaler` | Low | Needs answer (Q3.3) |
-| 13 | **NetworkPolicy** | `networkpolicy.yaml` | Low | Needs answer (Q5.4) |
-| 14 | **Image tag immutability** | tag is not `latest`; digest preferred | Medium | Needs answer if `latest` (Q1.4) |
-| 15 | **`imagePullPolicy`** | `IfNotPresent` (not `Always` in prod) | Low | Derivable |
-| 16 | **Pod anti-affinity** | spread across nodes for >1 replica | Low | Derivable (soft default) |
-| 17 | **`.helmignore`** | present | Low | Derivable |
-| 18 | **NOTES.txt** | post-install usage notes | Low | Derivable |
-| 19 | **Labels** | standard `app.kubernetes.io/*` labels | Low | Derivable |
-| 20 | **Probes/limits parity across overlays** | prod has explicit limits | Low | Derivable |
+## Audit checklist (static fallback when linters absent)
 
-Compare each item against the corresponding `reference/templates/` file as the "good" reference — but adapt to the existing chart's names and helper style.
+Detect each item from the inventory, classify the gap, then apply the *Derivable
+defaults*. Severity guide: securityContext/root/caps/probes/resources = **Critical/High**;
+schema/overlays/SA/PDB = **Medium**; docs/labels/anti-affinity/.helmignore = **Low**.
+Compare each item against the corresponding `reference/templates/` file as the "good"
+reference, adapting to the existing chart's names and helper style.
 
-## Gap → question mapping
+## Strategy B procedure (model-driven re-scaffold)
 
-Only ask for gaps that aren't derivable from the chart. Reuse the exact question text/defaults/explanations from `reference/explanations.md`:
+Chosen only when the user picks B. There is **no extraction script** — you do the mapping.
 
-| Gap | Question(s) |
-|-----|-------------|
-| readOnlyRootFilesystem writable paths | Q4.2 |
-| resource sizing | overlay `resourcesPreset` (nano/small/explicit) — see `explanations.md` § Environment overlays; ask only if the app needs explicit cpu/memory values |
-| probe health path | ask directly (no preset question); probe **port** = container port (Q1.5) |
-| ServiceAccount / IAM annotations | Q4.3 |
-| PDB minAvailable | Q3.4 |
-| HPA min/max/target | Q3.3 |
-| NetworkPolicy scope | Q5.4 |
-| image tag/digest (if `latest`) | Q1.4 |
-| ingress/TLS (only if user wants to add) | Q2.2 / Q2.3 |
-| persistence (only if user wants to add) | Q5.1 |
+1. **Read** the existing `Chart.yaml` + `values.yaml` (small) and skim `templates/` to
+   detect the workload kind and which features exist.
+2. **Write `answers.env`** mapping the existing settings to the keys in
+   `answers.example.env` (name, image repo/tag, port, workload, service type, and the
+   feature toggles inferred from values — `ingress.enabled`, `autoscaling.enabled`,
+   `persistence.enabled`, etc.).
+3. **Run the scaffold** into a *new* directory (not over the original):
+   `bash <skill-dir>/scaffold.sh --answers answers.env --out <tmp>`.
+4. **Re-apply custom values** the scaffold can't know about: copy the original chart's
+   app-specific `env`, `podAnnotations`, sidecars, extra objects, and bespoke values into
+   the regenerated chart. This is the lossy step — be thorough.
+5. **Diff old → new** and present it. Call out anything that changed semantically so the
+   user can catch a dropped custom value before replacing the original.
+6. Run the **quality gates** and report before→after.
 
-Do not re-ask anything the existing chart already answers (e.g. don't ask the port if `containerPort` is set — confirm it instead).
-
-## Proposal report format
-
-Present before doing any edits. Group by severity, highest first:
+## Proposal format (present before any Strategy-A/B edits)
 
 ```
-## Chart audit: <chart-name>
+## Chart audit: <chart-name>   (diagnosis: kube-score N CRITICAL / kube-linter M errors)
 
-### Critical (fix before production)
-- [ ] **Runs as root** — no `runAsNonRoot`. Proposed: add pod securityContext
-      `runAsNonRoot: true`, `runAsUser: 10001`. (auto-applicable)
-- [ ] **No dropped capabilities** — Proposed: `capabilities.drop: [ALL]`. (auto-applicable)
-
+### Critical
+- [x] Runs as root → add securityContext runAsNonRoot:true, runAsUser:10001  (applied default)
+- [x] No dropped capabilities → capabilities.drop:[ALL]                       (applied default)
 ### High
-- [ ] **No resource limits** — Proposed: add requests/limits via overlay
-      `resourcesPreset` (nano dev / small uat / explicit prod). (auto-applicable;
-      override the size if the app needs explicit values)
-- [ ] **No readiness/liveness probes** — Proposed: add probes on the container
-      port. NEEDS ANSWER: health path? (port = containerPort)
-
+- [x] No resource limits → overlay resourcesPreset (nano/small/explicit)      (override sizing if needed)
+- [x] No probes → TCP liveness+readiness on port <p>                          (override with HTTP path if any)
 ### Medium
-- [ ] No `values.schema.json` — Proposed: generate from current values. (auto-applicable)
-- [ ] No env overlays — Proposed: add values-dev/uat/prod.yaml (diffs only). (auto-applicable)
-
+- [x] No values.schema.json → generate from current values                   (applied default)
+- [x] No env overlays → add values-dev/uat/prod.yaml                          (applied default)
 ### Low
-- [ ] values.yaml undocumented — Proposed: add `# --` helm-docs comments. (auto-applicable)
+- [x] Undocumented values.yaml → add helm-docs # -- comments                  (applied default)
+- [ ] image tag `latest` → recommend pinning                                  (provide a tag/digest)
 
-**Structure preserved:** no files renamed/moved, no keys reordered.
+Custom values detected (preserved in A; re-applied manually in B): env[LOG_LEVEL,...], podAnnotations{...}
 
-Reply: approve all · approve auto-applicable only · pick items · and answer the NEEDS ANSWER questions below.
+**Choose a strategy:**
+- A) Harden in place — preserves your structure (recommended)
+- B) Refactor / re-scaffold from the standard templates — replaces structure; I re-apply
+     your custom values and show a before→after (review for dropped values)
+
+Reply: **approve A** · **approve B** · or name items to adjust.
+(Non-interactive: I'll apply A with these defaults and show you the before→after.)
 ```
 
-Wait for the user's decision and answers before editing — same blocking gate as Step 0. After applying, report a **before → after** summary and run the quality gates (`helm lint`, `helm template`, kube-linter/kube-score).
+After applying, report a **before → after** summary and run the quality gates.
